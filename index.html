@@ -834,7 +834,15 @@
                 CMS等級
                 <span class="step active" id="step1">Step 1</span>
             </div>
-            <div class="selector-grid" id="cmsGrid"></div>
+            <div class="selector-grid" id="cmsGrid">
+                <button class="selector-btn" data-level="2" onclick="selectCMS(2)">2級<span class="amount">10,020</span></button>
+                <button class="selector-btn" data-level="3" onclick="selectCMS(3)">3級<span class="amount">15,460</span></button>
+                <button class="selector-btn" data-level="4" onclick="selectCMS(4)">4級<span class="amount">18,580</span></button>
+                <button class="selector-btn" data-level="5" onclick="selectCMS(5)">5級<span class="amount">24,100</span></button>
+                <button class="selector-btn" data-level="6" onclick="selectCMS(6)">6級<span class="amount">28,070</span></button>
+                <button class="selector-btn" data-level="7" onclick="selectCMS(7)">7級<span class="amount">32,090</span></button>
+                <button class="selector-btn" data-level="8" onclick="selectCMS(8)">8級<span class="amount">36,180</span></button>
+            </div>
         </div>
 
         <!-- Step 2: 身份別 -->
@@ -847,7 +855,11 @@
                 身份別
                 <span class="step" id="step2">Step 2</span>
             </div>
-            <div class="identity-grid" id="identityGrid"></div>
+            <div class="identity-grid" id="identityGrid">
+                <button class="identity-btn" data-rate="0" data-identity="low" onclick="selectIdentity('low')">低收入戶<span class="rate">B/C 0%</span></button>
+                <button class="identity-btn" data-rate="5" data-identity="midLow" onclick="selectIdentity('midLow')">中低收入<span class="rate">B/C 5%</span></button>
+                <button class="identity-btn" data-rate="16" data-identity="general" onclick="selectIdentity('general')">一般戶<span class="rate">B/C 16%</span></button>
+            </div>
             <div class="toggle-row">
                 <div>
                     <div class="toggle-label">聘僱外籍看護工</div>
@@ -1233,51 +1245,50 @@
         }
 
         // ===== 渲染 =====
-        function renderCMS() {
-            const grid = $('cmsGrid');
-            grid.innerHTML = '';
-            Object.entries(CMS_BC_QUOTA).forEach(([level, amount]) => {
-                const btn = document.createElement('button');
-                btn.className = 'selector-btn' + (state.cmsLevel == level ? ' active' : '');
-                btn.innerHTML = level + '級<span class="amount">' + amount.toLocaleString() + '</span>';
-                btn.onclick = () => {
-                    state.cmsLevel = parseInt(level);
-                    renderCMS();
-                    renderIdentity();
-                    updateStepIndicators();
-                    updateSelectionSummary();
-                    if (state.identity) {
-                        renderAllServices();
-                        calculate();
-                    }
-                };
-                grid.appendChild(btn);
+        
+        // 全局選擇函數（供 onclick 使用）
+        function selectCMS(level) {
+            state.cmsLevel = parseInt(level);
+            updateCMSButtons();
+            updateIdentityButtons();
+            updateStepIndicators();
+            updateSelectionSummary();
+            if (state.identity) {
+                renderAllServices();
+                calculate();
+            }
+        }
+        
+        function selectIdentity(key) {
+            state.identity = key;
+            updateIdentityButtons();
+            updateStepIndicators();
+            updateSelectionSummary();
+            renderAllServices();
+            calculate();
+        }
+        
+        function updateCMSButtons() {
+            document.querySelectorAll('#cmsGrid .selector-btn').forEach(btn => {
+                const level = parseInt(btn.getAttribute('data-level'));
+                btn.classList.toggle('active', state.cmsLevel === level);
             });
+        }
+        
+        function updateIdentityButtons() {
+            document.querySelectorAll('#identityGrid .identity-btn').forEach(btn => {
+                const identity = btn.getAttribute('data-identity');
+                btn.classList.toggle('active', state.identity === identity);
+            });
+        }
+        
+        // 保留原函數名稱以兼容其他調用
+        function renderCMS() {
+            updateCMSButtons();
         }
 
         function renderIdentity() {
-            const grid = $('identityGrid');
-            grid.innerHTML = '';
-            const rates = [
-                { key: 'low', name: '低收入戶', rate: 0 },
-                { key: 'midLow', name: '中低收入', rate: 5 },
-                { key: 'general', name: '一般戶', rate: 16 }
-            ];
-            rates.forEach(({ key, name, rate }) => {
-                const btn = document.createElement('button');
-                btn.className = 'identity-btn' + (state.identity === key ? ' active' : '');
-                btn.setAttribute('data-rate', rate);
-                btn.innerHTML = name + '<span class="rate">B/C ' + rate + '%</span>';
-                btn.onclick = () => {
-                    state.identity = key;
-                    renderIdentity();
-                    updateStepIndicators();
-                    updateSelectionSummary();
-                    renderAllServices();
-                    calculate();
-                };
-                grid.appendChild(btn);
-            });
+            updateIdentityButtons();
         }
 
         function renderServiceList(services, containerId, headerClass) {
@@ -1464,12 +1475,17 @@
                 '</div>'
             ).join('');
 
-            const totalCopay = Math.floor(total * rate);
+            const totalCopay = total <= quota 
+                ? Math.floor(total * rate) 
+                : Math.floor(quota * rate) + (total - quota);
+            const copayLabel = total <= quota 
+                ? '自負 $' + totalCopay.toLocaleString()
+                : '自負 $' + totalCopay.toLocaleString() + ' (含超額)';
             subtotalEl.innerHTML = 
                 '<span class="calc-subtotal-label">B/C碼合計</span>' +
                 '<span class="calc-subtotal-value">' +
                 '<span class="amount">$' + total.toLocaleString() + '</span>' +
-                '<span class="copay">自負 $' + totalCopay.toLocaleString() + '</span>' +
+                '<span class="copay">' + copayLabel + '</span>' +
                 '</span>';
         }
 
@@ -1504,20 +1520,49 @@
                 '</div>'
             ).join('');
 
-            const totalCopay = Math.floor(total * rate);
+            const totalCopay = total <= quota 
+                ? Math.floor(total * rate) 
+                : Math.floor(quota * rate) + (total - quota);
+            const copayLabel = total <= quota 
+                ? '自負 $' + totalCopay.toLocaleString()
+                : '自負 $' + totalCopay.toLocaleString() + ' (含超額)';
             subtotalEl.innerHTML = 
                 '<span class="calc-subtotal-label">G碼合計</span>' +
                 '<span class="calc-subtotal-value">' +
                 '<span class="amount">$' + total.toLocaleString() + '</span>' +
-                '<span class="copay">自負 $' + totalCopay.toLocaleString() + '</span>' +
+                '<span class="copay">' + copayLabel + '</span>' +
                 '</span>';
         }
 
         function renderGrandTotal(bcTotal, gTotal, quotaBc, quotaG, rateBc, rateG) {
             const content = $('grandTotalContent');
             
-            const bcCopay = Math.floor(bcTotal * rateBc);
-            const gCopay = Math.floor(gTotal * rateG);
+            // B/C碼部分負擔計算（超額部分算100%）
+            let bcCopay;
+            let bcCopayLabel;
+            if (bcTotal <= quotaBc) {
+                bcCopay = Math.floor(bcTotal * rateBc);
+                bcCopayLabel = 'B/C碼 部分負擔 (' + (rateBc * 100) + '%)';
+            } else {
+                const inQuota = Math.floor(quotaBc * rateBc);
+                const overQuota = bcTotal - quotaBc;
+                bcCopay = inQuota + overQuota;
+                bcCopayLabel = 'B/C碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
+            }
+            
+            // G碼部分負擔計算（超額部分算100%）
+            let gCopay;
+            let gCopayLabel;
+            if (gTotal <= quotaG) {
+                gCopay = Math.floor(gTotal * rateG);
+                gCopayLabel = 'G碼 部分負擔 (' + (rateG * 100) + '%)';
+            } else {
+                const inQuota = Math.floor(quotaG * rateG);
+                const overQuota = gTotal - quotaG;
+                gCopay = inQuota + overQuota;
+                gCopayLabel = 'G碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
+            }
+            
             const dCopay = Math.floor(D_QUOTA * COPAY_RATES.d[state.identity] / 100);
 
             const bcRemain = quotaBc - bcTotal;
@@ -1537,7 +1582,7 @@
                 '<span class="grand-total-value ' + (bcRemain >= 0 ? 'remain' : 'negative') + '">' + bcRemain.toLocaleString() + ' 元</span>' +
                 '</div>' +
                 '<div class="grand-total-row">' +
-                '<span class="grand-total-label">B/C碼 部分負擔 (' + (rateBc * 100) + '%)</span>' +
+                '<span class="grand-total-label">' + bcCopayLabel + '</span>' +
                 '<span class="grand-total-value copay">' + bcCopay.toLocaleString() + ' 元</span>' +
                 '</div>' +
 
@@ -1563,7 +1608,7 @@
                 '<span class="grand-total-value ' + (gRemain >= 0 ? 'remain' : 'negative') + '">' + gRemain.toLocaleString() + ' 元</span>' +
                 '</div>' +
                 '<div class="grand-total-row">' +
-                '<span class="grand-total-label">G碼 部分負擔 (' + (rateG * 100) + '%)</span>' +
+                '<span class="grand-total-label">' + gCopayLabel + '</span>' +
                 '<span class="grand-total-value copay">' + gCopay.toLocaleString() + ' 元</span>' +
                 '</div>' +
 
@@ -1689,8 +1734,30 @@
                     }
                 });
 
-                const bcCopay = Math.floor(bcTotal * rateBc);
-                const gCopay = Math.floor(gTotal * rateG);
+                // B/C碼部分負擔計算（超額部分算100%）
+                let bcCopay;
+                let bcCopayText;
+                if (bcTotal <= quotaBc) {
+                    bcCopay = Math.floor(bcTotal * rateBc);
+                    bcCopayText = '部分負擔（' + (rateBc * 100) + '%）：' + bcCopay.toLocaleString() + '元';
+                } else {
+                    const overQuota = bcTotal - quotaBc;
+                    bcCopay = Math.floor(quotaBc * rateBc) + overQuota;
+                    bcCopayText = '部分負擔（含超額' + overQuota.toLocaleString() + '元）：' + bcCopay.toLocaleString() + '元';
+                }
+                
+                // G碼部分負擔計算（超額部分算100%）
+                let gCopay;
+                let gCopayText;
+                if (gTotal <= quotaG) {
+                    gCopay = Math.floor(gTotal * rateG);
+                    gCopayText = '部分負擔（' + (rateG * 100) + '%）：' + gCopay.toLocaleString() + '元';
+                } else {
+                    const overQuota = gTotal - quotaG;
+                    gCopay = Math.floor(quotaG * rateG) + overQuota;
+                    gCopayText = '部分負擔（含超額' + overQuota.toLocaleString() + '元）：' + gCopay.toLocaleString() + '元';
+                }
+                
                 const dCopay = Math.floor(D_QUOTA * rateD);
 
                 const lines = [
@@ -1710,7 +1777,7 @@
                 }
                 lines.push('已使用：' + bcTotal.toLocaleString() + '元');
                 lines.push('剩餘：' + (quotaBc - bcTotal).toLocaleString() + '元');
-                lines.push('部分負擔（' + (rateBc * 100) + '%）：' + bcCopay.toLocaleString() + '元');
+                lines.push(bcCopayText);
                 lines.push('');
 
                 lines.push('═══ D碼 交通接送 ═══');
@@ -1727,7 +1794,7 @@
                 }
                 lines.push('已使用：' + gTotal.toLocaleString() + '元');
                 lines.push('剩餘：' + (quotaG - gTotal).toLocaleString() + '元');
-                lines.push('部分負擔（' + (rateG * 100) + '%）：' + gCopay.toLocaleString() + '元');
+                lines.push(gCopayText);
                 lines.push('');
 
                 lines.push('══════════════════');
@@ -1781,8 +1848,28 @@
                     }
                 });
 
-                const bcCopay = Math.floor(bcTotal * rateBc);
-                const gCopay = Math.floor(gTotal * rateG);
+                // B/C碼部分負擔計算（超額部分算100%）
+                let bcCopay, bcCopayLabel;
+                if (bcTotal <= quotaBc) {
+                    bcCopay = Math.floor(bcTotal * rateBc);
+                    bcCopayLabel = '部分負擔（' + (rateBc * 100) + '%）';
+                } else {
+                    const overQuota = bcTotal - quotaBc;
+                    bcCopay = Math.floor(quotaBc * rateBc) + overQuota;
+                    bcCopayLabel = '部分負擔（含超額' + overQuota.toLocaleString() + '元）';
+                }
+                
+                // G碼部分負擔計算（超額部分算100%）
+                let gCopay, gCopayLabel;
+                if (gTotal <= quotaG) {
+                    gCopay = Math.floor(gTotal * rateG);
+                    gCopayLabel = '部分負擔（' + (rateG * 100) + '%）';
+                } else {
+                    const overQuota = gTotal - quotaG;
+                    gCopay = Math.floor(quotaG * rateG) + overQuota;
+                    gCopayLabel = '部分負擔（含超額' + overQuota.toLocaleString() + '元）';
+                }
+                
                 const dCopay = Math.floor(D_QUOTA * rateD);
                 const totalCopay = bcCopay + dCopay + gCopay;
 
@@ -1825,7 +1912,7 @@
                 html += '<div class="export-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">';
                 html += '<span class="export-row-label">已使用</span><span class="export-row-value highlight">' + bcTotal.toLocaleString() + ' 元</span></div>';
                 html += '<div class="export-row"><span class="export-row-label">剩餘額度</span><span class="export-row-value ' + (quotaBc - bcTotal >= 0 ? 'green' : 'red') + '">' + (quotaBc - bcTotal).toLocaleString() + ' 元</span></div>';
-                html += '<div class="export-row"><span class="export-row-label">部分負擔（' + (rateBc * 100) + '%）</span><span class="export-row-value orange">' + bcCopay.toLocaleString() + ' 元</span></div>';
+                html += '<div class="export-row"><span class="export-row-label">' + bcCopayLabel + '</span><span class="export-row-value orange">' + bcCopay.toLocaleString() + ' 元</span></div>';
                 html += '</div>';
 
                 // D碼
@@ -1854,7 +1941,7 @@
                 html += '<div class="export-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">';
                 html += '<span class="export-row-label">已使用</span><span class="export-row-value highlight">' + gTotal.toLocaleString() + ' 元</span></div>';
                 html += '<div class="export-row"><span class="export-row-label">剩餘額度</span><span class="export-row-value ' + (quotaG - gTotal >= 0 ? 'green' : 'red') + '">' + (quotaG - gTotal).toLocaleString() + ' 元</span></div>';
-                html += '<div class="export-row"><span class="export-row-label">部分負擔（' + (rateG * 100) + '%）</span><span class="export-row-value orange">' + gCopay.toLocaleString() + ' 元</span></div>';
+                html += '<div class="export-row"><span class="export-row-label">' + gCopayLabel + '</span><span class="export-row-value orange">' + gCopay.toLocaleString() + ' 元</span></div>';
                 html += '</div>';
 
                 // 總計
