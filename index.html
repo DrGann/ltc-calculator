@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="長照計算">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1e1b4b">
-    <meta name="description" content="長照服務額度計算工具 - B/C碼、G碼完整計算">
+    <meta name="description" content="長照服務額度計算工具 - B/C碼、D碼、G碼、SC碼完整計算">
     
     <title>長照額度計算工具</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -876,7 +876,7 @@
     <div class="container">
         <header>
             <h1>長照額度計算工具</h1>
-            <p>B/C碼・D碼・G碼 完整計算</p>
+            <p>B/C碼・D碼・G碼・SC碼 完整計算</p>
         </header>
 
         <!-- Step 1: CMS等級 -->
@@ -942,7 +942,7 @@
             <div id="scContainer" class="hidden"></div>
 
             <div class="info-note" id="foreignNote" style="display:none;">
-                <strong>⚠️ 外籍看護：</strong>B/C碼僅30%額度，限C碼及BA09/BA09a/BD03。D碼/G碼不受影響。
+                <strong>⚠️ 外籍看護：</strong>B/C碼僅30%額度，限C碼及BA09/BA09a/BD03。D碼/G碼不受影響，另可使用SC碼短照服務。
             </div>
         </div>
 
@@ -1178,17 +1178,17 @@
         // SC碼短照服務（僅適用聘僱外籍看護工）
         const SC_SERVICES = [
             { category: 'SC碼 短照服務（年額度）', items: [
-                { code: 'SC03', name: '日照中心喘息服務-全日', price: 1250, unit: '/日',
+                { code: 'SC03', name: '日照中心短照服務-全日', price: 1250, unit: '/日',
                   note: '含交通接送' },
-                { code: 'SC04', name: '日照中心喘息服務-半日', price: 625, unit: '/半日',
+                { code: 'SC04', name: '日照中心短照服務-半日', price: 625, unit: '/半日',
                   note: '含交通接送' },
-                { code: 'SC05', name: '機構住宿式喘息服務', price: 2310, unit: '/日',
+                { code: 'SC05', name: '機構住宿式短照服務', price: 2310, unit: '/日',
                   note: '24小時為一給付單位｜含交通接送' },
-                { code: 'SC06', name: '小規模多機能-夜間喘息', price: 2000, unit: '/夜',
+                { code: 'SC06', name: '小規模多機能-夜間短照', price: 2000, unit: '/夜',
                   note: '18:00-翌日08:00｜含交通接送' },
-                { code: 'SC07', name: '巷弄長照站喘息服務', price: 170, unit: '/hr',
+                { code: 'SC07', name: '巷弄長照站短照服務', price: 170, unit: '/hr',
                   note: '以每小時為給付單位' },
-                { code: 'SC09', name: '居家喘息服務', price: 770, unit: '/2hr',
+                { code: 'SC09', name: '居家短照服務', price: 770, unit: '/2hr',
                   note: '2小時為一給付單位｜日限5組(10hr)' },
             ]},
         ];
@@ -1696,7 +1696,7 @@
                 : Math.floor(quota * rate) + (total - quota);
             const copayLabel = total <= quota 
                 ? '自負 $' + totalCopay.toLocaleString()
-                : '自負 $' + totalCopay.toLocaleString() + ' (含超額)';
+                : '自負 $' + totalCopay.toLocaleString() + '（含超額）';
             subtotalEl.innerHTML = 
                 '<span class="calc-subtotal-label">B/C碼合計</span>' +
                 '<span class="calc-subtotal-value">' +
@@ -1741,7 +1741,7 @@
                 : Math.floor(quota * rate) + (total - quota);
             const copayLabel = total <= quota 
                 ? '自負 $' + totalCopay.toLocaleString()
-                : '自負 $' + totalCopay.toLocaleString() + ' (含超額)';
+                : '自負 $' + totalCopay.toLocaleString() + '（含超額）';
             subtotalEl.innerHTML = 
                 '<span class="calc-subtotal-label">G碼合計</span>' +
                 '<span class="calc-subtotal-value">' +
@@ -1788,7 +1788,7 @@
                 : Math.floor(quota * rate) + (total - quota);
             const copayLabel = total <= quota 
                 ? '自負 $' + totalCopay.toLocaleString()
-                : '自負 $' + totalCopay.toLocaleString() + ' (含超額)';
+                : '自負 $' + totalCopay.toLocaleString() + '（含超額）';
             subtotalEl.innerHTML = 
                 '<span class="calc-subtotal-label">SC碼合計</span>' +
                 '<span class="calc-subtotal-value">' +
@@ -1805,12 +1805,12 @@
             let bcCopayLabel;
             if (bcTotal <= quotaBc) {
                 bcCopay = Math.floor(bcTotal * rateBc);
-                bcCopayLabel = 'B/C碼 部分負擔 (' + (rateBc * 100) + '%)';
+                bcCopayLabel = 'B/C碼 部分負擔（' + (rateBc * 100) + '%）';
             } else {
                 const inQuota = Math.floor(quotaBc * rateBc);
                 const overQuota = bcTotal - quotaBc;
                 bcCopay = inQuota + overQuota;
-                bcCopayLabel = 'B/C碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
+                bcCopayLabel = 'B/C碼 部分負擔（含超額' + overQuota.toLocaleString() + '元）';
             }
             
             // G碼部分負擔計算（超額部分算100%）
@@ -1818,12 +1818,12 @@
             let gCopayLabel;
             if (gTotal <= quotaG) {
                 gCopay = Math.floor(gTotal * rateG);
-                gCopayLabel = 'G碼 部分負擔 (' + (rateG * 100) + '%)';
+                gCopayLabel = 'G碼 部分負擔（' + (rateG * 100) + '%）';
             } else {
                 const inQuota = Math.floor(quotaG * rateG);
                 const overQuota = gTotal - quotaG;
                 gCopay = inQuota + overQuota;
-                gCopayLabel = 'G碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
+                gCopayLabel = 'G碼 部分負擔（含超額' + overQuota.toLocaleString() + '元）';
             }
             
             // SC碼部分負擔計算（超額部分算100%）
@@ -1832,12 +1832,12 @@
             if (state.hasForeign && quotaSc > 0) {
                 if (scTotal <= quotaSc) {
                     scCopay = Math.floor(scTotal * rateSc);
-                    scCopayLabel = 'SC碼 部分負擔 (' + (rateSc * 100) + '%)';
+                    scCopayLabel = 'SC碼 部分負擔（' + (rateSc * 100) + '%）';
                 } else {
                     const inQuota = Math.floor(quotaSc * rateSc);
                     const overQuota = scTotal - quotaSc;
                     scCopay = inQuota + overQuota;
-                    scCopayLabel = 'SC碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
+                    scCopayLabel = 'SC碼 部分負擔（含超額' + overQuota.toLocaleString() + '元）';
                 }
             }
             
@@ -1849,7 +1849,7 @@
 
             let html = 
                 '<div class="grand-total-row">' +
-                '<span class="grand-total-label">B/C碼 月額度' + (state.hasForeign ? '(外籍30%)' : '') + '</span>' +
+                '<span class="grand-total-label" style="color:#60a5fa;">B/C碼 月額度' + (state.hasForeign ? '（外籍30%）' : '') + '</span>' +
                 '<span class="grand-total-value">' + quotaBc.toLocaleString() + ' 元</span>' +
                 '</div>' +
                 '<div class="grand-total-row">' +
@@ -1866,16 +1866,16 @@
                 '</div>' +
 
                 '<div class="grand-total-row" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">' +
-                '<span class="grand-total-label">D碼 月額度</span>' +
+                '<span class="grand-total-label" style="color:#a78bfa;">D碼 月額度（交通接送）</span>' +
                 '<span class="grand-total-value">' + D_QUOTA.toLocaleString() + ' 元</span>' +
                 '</div>' +
                 '<div class="grand-total-row">' +
-                '<span class="grand-total-label">D碼 部分負擔 (' + COPAY_RATES.d[state.identity] + '%)</span>' +
+                '<span class="grand-total-label">D碼 部分負擔（' + COPAY_RATES.d[state.identity] + '%）</span>' +
                 '<span class="grand-total-value copay">' + dCopay.toLocaleString() + ' 元</span>' +
                 '</div>' +
 
                 '<div class="grand-total-row" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">' +
-                '<span class="grand-total-label">G碼 年額度</span>' +
+                '<span class="grand-total-label" style="color:#fbbf24;">G碼 年額度（喘息）</span>' +
                 '<span class="grand-total-value">' + quotaG.toLocaleString() + ' 元</span>' +
                 '</div>' +
                 '<div class="grand-total-row">' +
@@ -2158,11 +2158,36 @@
                 lines.push('══════════════════');
                 lines.push('總部分負擔：' + (bcCopay + dCopay + gCopay + scCopay).toLocaleString() + '元');
 
-                navigator.clipboard.writeText(lines.join('\n')).then(() => {
-                    showToast('已複製到剪貼簿');
-                }).catch(() => {
-                    showToast('複製失敗');
-                });
+                const text = lines.join('\n');
+                
+                // 複製到剪貼簿（含 fallback）
+                function fallbackCopy(str) {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = str;
+                    textarea.style.position = 'fixed';
+                    textarea.style.left = '-9999px';
+                    textarea.style.top = '0';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast('已複製到剪貼簿');
+                    } catch (err) {
+                        showToast('複製失敗');
+                    }
+                    document.body.removeChild(textarea);
+                }
+                
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast('已複製到剪貼簿');
+                    }).catch(() => {
+                        fallbackCopy(text);
+                    });
+                } else {
+                    fallbackCopy(text);
+                }
             };
 
             $('exportBtn').onclick = async function () {
