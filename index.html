@@ -342,6 +342,49 @@
 
         .collapse-header h3.bc-header { color: #60a5fa; }
         .collapse-header h3.g-header { color: #fbbf24; }
+        .collapse-header h3.sc-header { color: #22d3ee; }
+
+        /* SC碼鎖定樣式 */
+        #scContainer {
+            position: relative;
+            margin-top: 10px;
+        }
+        
+        #scContainer.sc-locked {
+            opacity: 0.5;
+        }
+        
+        .sc-lock-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            z-index: 10;
+        }
+        
+        .sc-lock-overlay .lock-icon {
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+        
+        .sc-lock-overlay .lock-text {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        
+        .sc-placeholder {
+            padding: 12px;
+            background: rgba(6, 182, 212, 0.05);
+            border: 1px solid rgba(6, 182, 212, 0.1);
+            border-radius: 10px;
+        }
 
         .collapse-icon {
             font-size: 0.7rem;
@@ -383,6 +426,7 @@
         .service-item.c-item { border-left: 3px solid rgba(168, 85, 247, 0.5); }
         .service-item.bb-item { border-left: 3px solid rgba(34, 197, 94, 0.5); }
         .service-item.bc-item { border-left: 3px solid rgba(236, 72, 153, 0.5); }
+        .service-item.sc-item { border-left: 3px solid rgba(6, 182, 212, 0.5); }
 
         .service-info {
             flex: 1;
@@ -406,6 +450,7 @@
         .service-code.g-code { color: #fbbf24; }
         .service-code.bb-code { color: #22c55e; }
         .service-code.bc-code { color: #ec4899; }
+        .service-code.sc-code { color: #22d3ee; }
 
         .service-price {
             font-size: 0.72rem;
@@ -479,6 +524,11 @@
             border-color: rgba(251, 191, 36, 0.15);
         }
 
+        .calc-detail.sc-detail {
+            background: rgba(6, 182, 212, 0.08);
+            border-color: rgba(6, 182, 212, 0.15);
+        }
+
         .calc-detail-header {
             display: flex;
             justify-content: space-between;
@@ -495,6 +545,7 @@
         }
 
         .calc-detail.g-detail .calc-detail-title { color: #fbbf24; }
+        .calc-detail.sc-detail .calc-detail-title { color: #22d3ee; }
 
         .calc-detail-toggle {
             font-size: 0.7rem;
@@ -883,11 +934,12 @@
             
             <div class="tabs">
                 <button class="tab-btn tab-bc active" data-tab="bc">B/C碼</button>
-                <button class="tab-btn tab-g" data-tab="g">G碼</button>
+                <button class="tab-btn tab-g" data-tab="g">G/SC碼</button>
             </div>
 
             <div id="bcContainer"></div>
             <div id="gContainer" class="hidden"></div>
+            <div id="scContainer" class="hidden"></div>
 
             <div class="info-note" id="foreignNote" style="display:none;">
                 <strong>⚠️ 外籍看護：</strong>B/C碼僅30%額度，限C碼及BA09/BA09a/BD03。D碼/G碼不受影響。
@@ -911,6 +963,15 @@
             </div>
             <div class="calc-detail-content open" id="gCalcContent"></div>
             <div class="calc-subtotal" id="gSubtotal"></div>
+        </div>
+
+        <div id="scCalcDetail" class="calc-detail sc-detail hidden">
+            <div class="calc-detail-header" id="scCalcToggle">
+                <span class="calc-detail-title">SC碼 計算明細</span>
+                <span class="calc-detail-toggle open">▼</span>
+            </div>
+            <div class="calc-detail-content open" id="scCalcContent"></div>
+            <div class="calc-subtotal" id="scSubtotal"></div>
         </div>
 
         <!-- 總計 -->
@@ -945,6 +1006,11 @@
             2: 32340, 3: 32340, 4: 32340, 5: 32340, 6: 32340, 7: 48510, 8: 48510
         };
 
+        // SC碼短照服務額度（僅限聘僱外籍看護工）
+        const CMS_SC_QUOTA = {
+            2: 87780, 3: 87780, 4: 87780, 5: 87780, 6: 87780, 7: 71610, 8: 71610
+        };
+
         const BB_PRICES = {
             2: { full: 675, half: 340 },
             3: { full: 840, half: 420 },
@@ -968,7 +1034,8 @@
         const COPAY_RATES = {
             bc: { low: 0, midLow: 5, general: 16 },
             d: { low: 0, midLow: 9, general: 27 },
-            g: { low: 0, midLow: 5, general: 16 }
+            g: { low: 0, midLow: 5, general: 16 },
+            sc: { low: 0, midLow: 5, general: 16 }
         };
 
         const IDENTITY_NAMES = {
@@ -1108,6 +1175,24 @@
             ]},
         ];
 
+        // SC碼短照服務（僅適用聘僱外籍看護工）
+        const SC_SERVICES = [
+            { category: 'SC碼 短照服務（年額度）', items: [
+                { code: 'SC03', name: '日照中心喘息服務-全日', price: 1250, unit: '/日',
+                  note: '含交通接送' },
+                { code: 'SC04', name: '日照中心喘息服務-半日', price: 625, unit: '/半日',
+                  note: '含交通接送' },
+                { code: 'SC05', name: '機構住宿式喘息服務', price: 2310, unit: '/日',
+                  note: '24小時為一給付單位｜含交通接送' },
+                { code: 'SC06', name: '小規模多機能-夜間喘息', price: 2000, unit: '/夜',
+                  note: '18:00-翌日08:00｜含交通接送' },
+                { code: 'SC07', name: '巷弄長照站喘息服務', price: 170, unit: '/hr',
+                  note: '以每小時為給付單位' },
+                { code: 'SC09', name: '居家喘息服務', price: 770, unit: '/2hr',
+                  note: '2小時為一給付單位｜日限5組(10hr)' },
+            ]},
+        ];
+
         // ===== 狀態 =====
         let state = {
             cmsLevel: null,
@@ -1116,10 +1201,10 @@
             quantities: {},
             expanded: {},
             activeTab: 'bc',
-            calcExpanded: { bc: true, g: true }
+            calcExpanded: { bc: true, g: true, sc: true }
         };
 
-        [...B_SERVICES, ...C_SERVICES, ...G_SERVICES].forEach(cat => {
+        [...B_SERVICES, ...C_SERVICES, ...G_SERVICES, ...SC_SERVICES].forEach(cat => {
             state.expanded[cat.category] = false;
         });
 
@@ -1172,6 +1257,10 @@
 
         function getAllGServices() {
             return G_SERVICES.flatMap(c => c.items);
+        }
+
+        function getAllScServices() {
+            return SC_SERVICES.flatMap(c => c.items);
         }
 
         function updateStepIndicators() {
@@ -1232,6 +1321,10 @@
             
             html += '<span class="summary-tag">B/C額度 $' + quotaBc.toLocaleString() + '</span>';
             html += '<span class="summary-tag">G額度 $' + CMS_G_QUOTA[state.cmsLevel].toLocaleString() + '</span>';
+            
+            if (state.hasForeign) {
+                html += '<span class="summary-tag" style="color:#22d3ee;">SC額度 $' + CMS_SC_QUOTA[state.cmsLevel].toLocaleString() + '</span>';
+            }
             
             if (state.identity) {
                 html += '<span class="summary-tag">' + IDENTITY_NAMES[state.identity] + '</span>';
@@ -1392,6 +1485,107 @@
         function renderAllServices() {
             renderServiceList([...B_SERVICES, ...C_SERVICES], 'bcContainer', 'bc-header');
             renderServiceList(G_SERVICES, 'gContainer', 'g-header');
+            renderScServices();
+        }
+        
+        // SC碼單獨渲染（帶鎖定邏輯）
+        function renderScServices() {
+            const container = $('scContainer');
+            if (!container) return;
+            
+            // 更新鎖定狀態
+            container.classList.toggle('sc-locked', !state.hasForeign);
+            
+            if (!state.hasForeign) {
+                container.innerHTML = 
+                    '<div class="sc-lock-overlay">' +
+                    '<span class="lock-icon">🔒</span>' +
+                    '<span class="lock-text">僅適用聘僱外籍看護工家庭</span>' +
+                    '</div>' +
+                    '<div class="sc-placeholder">' +
+                    '<div class="collapse-header">' +
+                    '<h3 class="sc-header">SC碼 短照服務（年額度）</h3>' +
+                    '<span class="collapse-icon">▼</span>' +
+                    '</div>' +
+                    '</div>';
+                return;
+            }
+            
+            // 有外籍看護工時正常渲染
+            container.innerHTML = '';
+            SC_SERVICES.forEach(category => {
+                const items = category.items;
+                if (items.length === 0) return;
+
+                const section = document.createElement('div');
+                section.className = 'service-section';
+                const isOpen = state.expanded[category.category];
+
+                section.innerHTML =
+                    '<div class="collapse-header" data-cat="' + category.category + '">' +
+                    '<h3 class="sc-header">' + category.category + '</h3>' +
+                    '<span class="collapse-icon ' + (isOpen ? 'open' : '') + '">▼</span>' +
+                    '</div>' +
+                    '<div class="collapse-content ' + (isOpen ? 'open' : '') + '">' +
+                    '<div class="service-list"></div>' +
+                    '</div>';
+
+                const list = section.querySelector('.service-list');
+                items.forEach(item => {
+                    const qty = state.quantities[item.code] || 0;
+                    const maxQty = item.maxQty || 999;
+                    const price = item.price;
+
+                    const div = document.createElement('div');
+                    div.className = 'service-item sc-item';
+                    
+                    const showPlus5 = maxQty > 1;
+                    
+                    div.innerHTML =
+                        '<div class="service-info">' +
+                        '<div class="service-name">' +
+                        '<span class="service-code sc-code">' + item.code + '</span>' + item.name +
+                        '</div>' +
+                        '<div class="service-price">$' + price.toLocaleString() + (item.unit || '') + '</div>' +
+                        (item.note ? '<div class="service-note">' + item.note + '</div>' : '') +
+                        '</div>' +
+                        '<div class="service-controls">' +
+                        '<button class="qty-btn minus" data-code="' + item.code + '">−</button>' +
+                        '<span class="qty-display ' + (qty > 0 ? 'has-value' : '') + '">' + qty + '</span>' +
+                        '<button class="qty-btn plus" data-code="' + item.code + '" data-max="' + maxQty + '" ' + (qty >= maxQty ? 'disabled' : '') + '>+</button>' +
+                        (showPlus5 ? '<button class="qty-btn plus5" data-code="' + item.code + '" data-max="' + maxQty + '" ' + (qty >= maxQty ? 'disabled' : '') + '>+5</button>' : '') +
+                        '</div>';
+
+                    list.appendChild(div);
+                });
+
+                // 設定展開/收合
+                section.querySelector('.collapse-header').onclick = function () {
+                    const cat = this.getAttribute('data-cat');
+                    state.expanded[cat] = !state.expanded[cat];
+                    this.querySelector('.collapse-icon').classList.toggle('open');
+                    this.nextElementSibling.classList.toggle('open');
+                };
+
+                // 數量按鈕
+                section.querySelectorAll('.qty-btn').forEach(btn => {
+                    btn.onclick = function () {
+                        if (this.disabled) return;
+                        const code = this.getAttribute('data-code');
+                        const max = parseInt(this.getAttribute('data-max')) || 999;
+                        let delta = 0;
+                        if (this.classList.contains('minus')) delta = -1;
+                        else if (this.classList.contains('plus')) delta = 1;
+                        else if (this.classList.contains('plus5')) delta = 5;
+
+                        state.quantities[code] = Math.max(0, Math.min(max, (state.quantities[code] || 0) + delta));
+                        renderScServices();
+                        calculate();
+                    };
+                });
+
+                container.appendChild(section);
+            });
         }
 
         // ===== 計算 =====
@@ -1400,8 +1594,10 @@
 
             const bcItems = getAllBcServices();
             const gItems = getAllGServices();
+            const scItems = getAllScServices();
             const rateBc = COPAY_RATES.bc[state.identity] / 100;
             const rateG = COPAY_RATES.g[state.identity] / 100;
+            const rateSc = COPAY_RATES.sc[state.identity] / 100;
 
             let bcTotal = 0;
             const bcSelected = [];
@@ -1435,13 +1631,33 @@
                 gSelected.push({ ...item, qty, subtotal, copayUnit, copayTotal });
             });
 
+            // SC碼計算（僅在有外籍看護工時）
+            let scTotal = 0;
+            const scSelected = [];
+
+            if (state.hasForeign) {
+                Object.entries(state.quantities).forEach(([code, qty]) => {
+                    if (qty <= 0) return;
+                    const item = scItems.find(s => s.code === code);
+                    if (!item) return;
+
+                    const subtotal = item.price * qty;
+                    const copayUnit = Math.floor(item.price * rateSc);
+                    const copayTotal = Math.floor(subtotal * rateSc);
+                    scTotal += subtotal;
+                    scSelected.push({ ...item, qty, subtotal, copayUnit, copayTotal });
+                });
+            }
+
             let quotaBc = CMS_BC_QUOTA[state.cmsLevel];
             if (state.hasForeign) quotaBc = Math.floor(quotaBc * 0.3);
             const quotaG = CMS_G_QUOTA[state.cmsLevel];
+            const quotaSc = state.hasForeign ? CMS_SC_QUOTA[state.cmsLevel] : 0;
 
             renderBcCalcDetail(bcSelected, bcTotal, quotaBc, rateBc);
             renderGCalcDetail(gSelected, gTotal, quotaG, rateG);
-            renderGrandTotal(bcTotal, gTotal, quotaBc, quotaG, rateBc, rateG);
+            renderScCalcDetail(scSelected, scTotal, quotaSc, rateSc);
+            renderGrandTotal(bcTotal, gTotal, scTotal, quotaBc, quotaG, quotaSc, rateBc, rateG, rateSc);
         }
 
         function renderBcCalcDetail(selected, total, quota, rate) {
@@ -1534,7 +1750,54 @@
                 '</span>';
         }
 
-        function renderGrandTotal(bcTotal, gTotal, quotaBc, quotaG, rateBc, rateG) {
+        function renderScCalcDetail(selected, total, quota, rate) {
+            const detail = $('scCalcDetail');
+            const content = $('scCalcContent');
+            const subtotalEl = $('scSubtotal');
+
+            if (!detail) return;
+
+            if (selected.length === 0 || !state.hasForeign) {
+                detail.classList.add('hidden');
+                return;
+            }
+
+            detail.classList.remove('hidden');
+            
+            content.innerHTML = selected.map(item => 
+                '<div class="calc-item">' +
+                '<div class="calc-item-header">' +
+                '<span class="calc-item-name"><span class="code">' + item.code + '</span>' + item.name + '</span>' +
+                '<span class="calc-item-qty">× ' + item.qty + '</span>' +
+                '</div>' +
+                '<div class="calc-item-rows">' +
+                '<div class="calc-row">' +
+                '<span class="calc-row-label">單價</span>' +
+                '<span class="calc-row-value">$' + item.price.toLocaleString() + '<span class="copay">自負 $' + item.copayUnit.toLocaleString() + '</span></span>' +
+                '</div>' +
+                '<div class="calc-row">' +
+                '<span class="calc-row-label">小計 (' + item.qty + '組)</span>' +
+                '<span class="calc-row-value">$' + item.subtotal.toLocaleString() + '<span class="copay">自負 $' + item.copayTotal.toLocaleString() + '</span></span>' +
+                '</div>' +
+                '</div>' +
+                '</div>'
+            ).join('');
+
+            const totalCopay = total <= quota 
+                ? Math.floor(total * rate) 
+                : Math.floor(quota * rate) + (total - quota);
+            const copayLabel = total <= quota 
+                ? '自負 $' + totalCopay.toLocaleString()
+                : '自負 $' + totalCopay.toLocaleString() + ' (含超額)';
+            subtotalEl.innerHTML = 
+                '<span class="calc-subtotal-label">SC碼合計</span>' +
+                '<span class="calc-subtotal-value">' +
+                '<span class="amount">$' + total.toLocaleString() + '</span>' +
+                '<span class="copay">' + copayLabel + '</span>' +
+                '</span>';
+        }
+
+        function renderGrandTotal(bcTotal, gTotal, scTotal, quotaBc, quotaG, quotaSc, rateBc, rateG, rateSc) {
             const content = $('grandTotalContent');
             
             // B/C碼部分負擔計算（超額部分算100%）
@@ -1563,12 +1826,28 @@
                 gCopayLabel = 'G碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
             }
             
+            // SC碼部分負擔計算（超額部分算100%）
+            let scCopay = 0;
+            let scCopayLabel = '';
+            if (state.hasForeign && quotaSc > 0) {
+                if (scTotal <= quotaSc) {
+                    scCopay = Math.floor(scTotal * rateSc);
+                    scCopayLabel = 'SC碼 部分負擔 (' + (rateSc * 100) + '%)';
+                } else {
+                    const inQuota = Math.floor(quotaSc * rateSc);
+                    const overQuota = scTotal - quotaSc;
+                    scCopay = inQuota + overQuota;
+                    scCopayLabel = 'SC碼 部分負擔 (含超額' + overQuota.toLocaleString() + '元)';
+                }
+            }
+            
             const dCopay = Math.floor(D_QUOTA * COPAY_RATES.d[state.identity] / 100);
 
             const bcRemain = quotaBc - bcTotal;
             const gRemain = quotaG - gTotal;
+            const scRemain = quotaSc - scTotal;
 
-            content.innerHTML = 
+            let html = 
                 '<div class="grand-total-row">' +
                 '<span class="grand-total-label">B/C碼 月額度' + (state.hasForeign ? '(外籍30%)' : '') + '</span>' +
                 '<span class="grand-total-value">' + quotaBc.toLocaleString() + ' 元</span>' +
@@ -1610,12 +1889,36 @@
                 '<div class="grand-total-row">' +
                 '<span class="grand-total-label">' + gCopayLabel + '</span>' +
                 '<span class="grand-total-value copay">' + gCopay.toLocaleString() + ' 元</span>' +
-                '</div>' +
+                '</div>';
 
+            // SC碼區塊（僅在有外籍看護工時顯示）
+            if (state.hasForeign) {
+                html +=
+                    '<div class="grand-total-row" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">' +
+                    '<span class="grand-total-label" style="color:#22d3ee;">SC碼 年額度（短照）</span>' +
+                    '<span class="grand-total-value">' + quotaSc.toLocaleString() + ' 元</span>' +
+                    '</div>' +
+                    '<div class="grand-total-row">' +
+                    '<span class="grand-total-label">SC碼 已使用</span>' +
+                    '<span class="grand-total-value total">' + scTotal.toLocaleString() + ' 元</span>' +
+                    '</div>' +
+                    '<div class="grand-total-row">' +
+                    '<span class="grand-total-label">SC碼 剩餘</span>' +
+                    '<span class="grand-total-value ' + (scRemain >= 0 ? 'remain' : 'negative') + '">' + scRemain.toLocaleString() + ' 元</span>' +
+                    '</div>' +
+                    '<div class="grand-total-row">' +
+                    '<span class="grand-total-label">' + scCopayLabel + '</span>' +
+                    '<span class="grand-total-value copay">' + scCopay.toLocaleString() + ' 元</span>' +
+                    '</div>';
+            }
+
+            html +=
                 '<div class="grand-total-row main">' +
                 '<span class="grand-total-label">總部分負擔</span>' +
-                '<span class="grand-total-value copay">' + (bcCopay + dCopay + gCopay).toLocaleString() + ' 元</span>' +
+                '<span class="grand-total-value copay">' + (bcCopay + dCopay + gCopay + scCopay).toLocaleString() + ' 元</span>' +
                 '</div>';
+            
+            content.innerHTML = html;
         }
 
         // ===== Tab切換 =====
@@ -1630,6 +1933,7 @@
 
                     $('bcContainer').classList.toggle('hidden', tab !== 'bc');
                     $('gContainer').classList.toggle('hidden', tab !== 'g');
+                    $('scContainer').classList.toggle('hidden', tab !== 'g');
                 };
             });
         }
@@ -1644,6 +1948,12 @@
             $('gCalcToggle').onclick = function() {
                 state.calcExpanded.g = !state.calcExpanded.g;
                 $('gCalcContent').classList.toggle('open');
+                this.querySelector('.calc-detail-toggle').classList.toggle('open');
+            };
+
+            $('scCalcToggle').onclick = function() {
+                state.calcExpanded.sc = !state.calcExpanded.sc;
+                $('scCalcContent').classList.toggle('open');
                 this.querySelector('.calc-detail-toggle').classList.toggle('open');
             };
         }
@@ -1677,6 +1987,7 @@
                 $('foreignNote').style.display = 'none';
                 $('bcCalcDetail').classList.add('hidden');
                 $('gCalcDetail').classList.add('hidden');
+                $('scCalcDetail').classList.add('hidden');
                 $('grandTotalContent').innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;font-size:0.85rem;">請先選擇 CMS 等級與身份別</div>';
                 
                 renderCMS();
@@ -1695,16 +2006,19 @@
 
                 const bcItems = getAllBcServices();
                 const gItems = getAllGServices();
+                const scItems = getAllScServices();
                 const rateBc = COPAY_RATES.bc[state.identity] / 100;
                 const rateG = COPAY_RATES.g[state.identity] / 100;
+                const rateSc = COPAY_RATES.sc[state.identity] / 100;
                 const rateD = COPAY_RATES.d[state.identity] / 100;
 
                 let quotaBc = CMS_BC_QUOTA[state.cmsLevel];
                 if (state.hasForeign) quotaBc = Math.floor(quotaBc * 0.3);
                 const quotaG = CMS_G_QUOTA[state.cmsLevel];
+                const quotaSc = state.hasForeign ? CMS_SC_QUOTA[state.cmsLevel] : 0;
 
-                let bcTotal = 0, gTotal = 0;
-                const bcLines = [], gLines = [];
+                let bcTotal = 0, gTotal = 0, scTotal = 0;
+                const bcLines = [], gLines = [], scLines = [];
 
                 Object.entries(state.quantities).forEach(([code, qty]) => {
                     if (qty <= 0) return;
@@ -1731,6 +2045,21 @@
                         gLines.push('• ' + code + ' ' + gItem.name);
                         gLines.push('  單價 $' + gItem.price.toLocaleString() + '（自負 $' + copayUnit.toLocaleString() + '）');
                         gLines.push('  ' + qty + '組 $' + subtotal.toLocaleString() + '（自負 $' + copayTotal.toLocaleString() + '）');
+                        return;
+                    }
+
+                    // SC碼
+                    if (state.hasForeign) {
+                        const scItem = scItems.find(s => s.code === code);
+                        if (scItem) {
+                            const subtotal = scItem.price * qty;
+                            const copayUnit = Math.floor(scItem.price * rateSc);
+                            const copayTotal = Math.floor(subtotal * rateSc);
+                            scTotal += subtotal;
+                            scLines.push('• ' + code + ' ' + scItem.name);
+                            scLines.push('  單價 $' + scItem.price.toLocaleString() + '（自負 $' + copayUnit.toLocaleString() + '）');
+                            scLines.push('  ' + qty + '組 $' + subtotal.toLocaleString() + '（自負 $' + copayTotal.toLocaleString() + '）');
+                        }
                     }
                 });
 
@@ -1756,6 +2085,20 @@
                     const overQuota = gTotal - quotaG;
                     gCopay = Math.floor(quotaG * rateG) + overQuota;
                     gCopayText = '部分負擔（含超額' + overQuota.toLocaleString() + '元）：' + gCopay.toLocaleString() + '元';
+                }
+
+                // SC碼部分負擔計算（超額部分算100%）
+                let scCopay = 0;
+                let scCopayText = '';
+                if (state.hasForeign && quotaSc > 0) {
+                    if (scTotal <= quotaSc) {
+                        scCopay = Math.floor(scTotal * rateSc);
+                        scCopayText = '部分負擔（' + (rateSc * 100) + '%）：' + scCopay.toLocaleString() + '元';
+                    } else {
+                        const overQuota = scTotal - quotaSc;
+                        scCopay = Math.floor(quotaSc * rateSc) + overQuota;
+                        scCopayText = '部分負擔（含超額' + overQuota.toLocaleString() + '元）：' + scCopay.toLocaleString() + '元';
+                    }
                 }
                 
                 const dCopay = Math.floor(D_QUOTA * rateD);
@@ -1797,8 +2140,23 @@
                 lines.push(gCopayText);
                 lines.push('');
 
+                // SC碼區塊（僅在有外籍看護工時顯示）
+                if (state.hasForeign) {
+                    lines.push('═══ SC碼 短照服務 ═══');
+                    lines.push('年額度：' + quotaSc.toLocaleString() + '元');
+                    if (scLines.length > 0) {
+                        lines.push('');
+                        lines.push(...scLines);
+                        lines.push('');
+                    }
+                    lines.push('已使用：' + scTotal.toLocaleString() + '元');
+                    lines.push('剩餘：' + (quotaSc - scTotal).toLocaleString() + '元');
+                    lines.push(scCopayText);
+                    lines.push('');
+                }
+
                 lines.push('══════════════════');
-                lines.push('總部分負擔：' + (bcCopay + dCopay + gCopay).toLocaleString() + '元');
+                lines.push('總部分負擔：' + (bcCopay + dCopay + gCopay + scCopay).toLocaleString() + '元');
 
                 navigator.clipboard.writeText(lines.join('\n')).then(() => {
                     showToast('已複製到剪貼簿');
@@ -1817,16 +2175,19 @@
 
                 const bcItems = getAllBcServices();
                 const gItems = getAllGServices();
+                const scItems = getAllScServices();
                 const rateBc = COPAY_RATES.bc[state.identity] / 100;
                 const rateG = COPAY_RATES.g[state.identity] / 100;
+                const rateSc = COPAY_RATES.sc[state.identity] / 100;
                 const rateD = COPAY_RATES.d[state.identity] / 100;
 
                 let quotaBc = CMS_BC_QUOTA[state.cmsLevel];
                 if (state.hasForeign) quotaBc = Math.floor(quotaBc * 0.3);
                 const quotaG = CMS_G_QUOTA[state.cmsLevel];
+                const quotaSc = state.hasForeign ? CMS_SC_QUOTA[state.cmsLevel] : 0;
 
-                let bcTotal = 0, gTotal = 0;
-                const bcSelected = [], gSelected = [];
+                let bcTotal = 0, gTotal = 0, scTotal = 0;
+                const bcSelected = [], gSelected = [], scSelected = [];
 
                 Object.entries(state.quantities).forEach(([code, qty]) => {
                     if (qty <= 0) return;
@@ -1845,6 +2206,17 @@
                         const subtotal = gItem.price * qty;
                         gTotal += subtotal;
                         gSelected.push({ ...gItem, qty, subtotal });
+                        return;
+                    }
+
+                    // SC碼
+                    if (state.hasForeign) {
+                        const scItem = scItems.find(s => s.code === code);
+                        if (scItem) {
+                            const subtotal = scItem.price * qty;
+                            scTotal += subtotal;
+                            scSelected.push({ ...scItem, qty, subtotal });
+                        }
                     }
                 });
 
@@ -1869,9 +2241,22 @@
                     gCopay = Math.floor(quotaG * rateG) + overQuota;
                     gCopayLabel = '部分負擔（含超額' + overQuota.toLocaleString() + '元）';
                 }
+
+                // SC碼部分負擔計算（超額部分算100%）
+                let scCopay = 0, scCopayLabel = '';
+                if (state.hasForeign && quotaSc > 0) {
+                    if (scTotal <= quotaSc) {
+                        scCopay = Math.floor(scTotal * rateSc);
+                        scCopayLabel = '部分負擔（' + (rateSc * 100) + '%）';
+                    } else {
+                        const overQuota = scTotal - quotaSc;
+                        scCopay = Math.floor(quotaSc * rateSc) + overQuota;
+                        scCopayLabel = '部分負擔（含超額' + overQuota.toLocaleString() + '元）';
+                    }
+                }
                 
                 const dCopay = Math.floor(D_QUOTA * rateD);
-                const totalCopay = bcCopay + dCopay + gCopay;
+                const totalCopay = bcCopay + dCopay + gCopay + scCopay;
 
                 const now = new Date();
                 const dateStr = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
@@ -1943,6 +2328,30 @@
                 html += '<div class="export-row"><span class="export-row-label">剩餘額度</span><span class="export-row-value ' + (quotaG - gTotal >= 0 ? 'green' : 'red') + '">' + (quotaG - gTotal).toLocaleString() + ' 元</span></div>';
                 html += '<div class="export-row"><span class="export-row-label">' + gCopayLabel + '</span><span class="export-row-value orange">' + gCopay.toLocaleString() + ' 元</span></div>';
                 html += '</div>';
+
+                // SC碼（僅在有外籍看護工時顯示）
+                if (state.hasForeign) {
+                    html += '<div class="export-section">';
+                    html += '<div class="export-section-title" style="color:#22d3ee;">SC碼 短照服務（年額度）</div>';
+                    html += '<div class="export-row"><span class="export-row-label">年額度</span><span class="export-row-value">' + quotaSc.toLocaleString() + ' 元</span></div>';
+                    
+                    if (scSelected.length > 0) {
+                        scSelected.forEach(item => {
+                            html += '<div class="export-item">';
+                            html += '<div class="export-item-header">';
+                            html += '<span class="export-item-name"><span class="code">' + item.code + '</span>' + item.name + '</span>';
+                            html += '</div>';
+                            html += '<div class="export-item-detail">$' + item.price.toLocaleString() + ' × ' + item.qty + '組 = $' + item.subtotal.toLocaleString() + '</div>';
+                            html += '</div>';
+                        });
+                    }
+                    
+                    html += '<div class="export-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">';
+                    html += '<span class="export-row-label">已使用</span><span class="export-row-value highlight">' + scTotal.toLocaleString() + ' 元</span></div>';
+                    html += '<div class="export-row"><span class="export-row-label">剩餘額度</span><span class="export-row-value ' + (quotaSc - scTotal >= 0 ? 'green' : 'red') + '">' + (quotaSc - scTotal).toLocaleString() + ' 元</span></div>';
+                    html += '<div class="export-row"><span class="export-row-label">' + scCopayLabel + '</span><span class="export-row-value orange">' + scCopay.toLocaleString() + ' 元</span></div>';
+                    html += '</div>';
+                }
 
                 // 總計
                 html += '<div class="export-total">';
