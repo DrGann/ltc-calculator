@@ -29,7 +29,7 @@
         html, body {
             font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100％）;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
             color: #f1f5f9;
             overflow-x: hidden;
         }
@@ -719,7 +719,7 @@
             left: -9999px;
             top: 0;
             width: 400px;
-            background: linear-gradient(135deg, #1e3a5f 0%, #1e1b4b 100％）;
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e1b4b 100%);
             font-family: 'Noto Sans TC', sans-serif;
             padding: 24px;
             color: #f1f5f9;
@@ -836,7 +836,7 @@
             position: fixed;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50％） scale(0.9);
+            transform: translate(-50%, -50%) scale(0.9);
             background: rgba(30, 27, 75, 0.95);
             -webkit-backdrop-filter: blur(12px);
             backdrop-filter: blur(12px);
@@ -854,7 +854,7 @@
         .toast.show {
             opacity: 1;
             visibility: visible;
-            transform: translate(-50%, -50％） scale(1);
+            transform: translate(-50%, -50%) scale(1);
         }
 
         .hidden { display: none !important; }
@@ -1977,7 +1977,7 @@
                         '<div class="service-name">' +
                         '<span class="service-code ef-code">' + item.code + '</span>' + item.name +
                         '</div>' +
-                        '<div class="service-price">補助 $' + price.toLocaleString() + unitText + (item.freePartial ? '' : ' （自付' + (state.identity ? EF_COPAY_RATES[state.identity] : 30) + '％）') + '</div>' +
+                        '<div class="service-price">補助 $' + price.toLocaleString() + unitText + (item.freePartial ? '' : ' （自付' + (state.identity ? EF_COPAY_RATES[state.identity] : 30) + '%）') + '</div>' +
                         tagsHtml +
                         (item.note ? '<div class="service-note">' + item.note + '</div>' : '') +
                         '</div>' +
