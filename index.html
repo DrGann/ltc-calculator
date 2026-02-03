@@ -1969,7 +1969,8 @@
                     tagsHtml += '</div>';
 
                     const unitText = item.isRental ? '/月' : '';
-                    const showPlus5 = maxQty > 1;
+                    // 只有租賃項目才顯示+5按鈕（方便選擇多月）
+                    const showPlus5 = item.isRental && maxQty > 5;
 
                     div.innerHTML =
                         '<div class="service-info">' +
