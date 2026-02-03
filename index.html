@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="長照計算">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1e1b4b">
-    <meta name="description" content="長照服務額度計算工具 - B/C碼、D碼、G碼、SC碼完整計算">
+    <meta name="description" content="長照服務額度計算工具 - B/C碼、D碼、G碼、SC碼、EF碼輔具服務完整計算">
     
     <title>長照額度計算工具</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -870,13 +870,69 @@
         }
 
         .info-note strong { color: #f97316; }
+
+        /* EF碼輔具服務樣式 */
+        .service-item.ef-item { border-left: 3px solid rgba(16, 185, 129, 0.5); }
+        .service-code.ef-code { color: #10b981; }
+        .collapse-header h3.ef-header { color: #10b981; }
+
+        .calc-detail.ef-detail {
+            background: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.15);
+        }
+        .calc-detail.ef-detail .calc-detail-title { color: #10b981; }
+
+        .tab-btn.active.tab-ef { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .service-item .item-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+        .service-item .item-tag {
+            font-size: 0.62rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            color: #94a3b8;
+        }
+        .service-item .item-tag.tag-eval { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+        .service-item .item-tag.tag-free { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .service-item .item-tag.tag-rent { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+
+        .ef-mode-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+        }
+        .ef-mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 0.78rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ef-mode-btn.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>長照額度計算工具</h1>
-            <p>B/C碼・D碼・G碼・SC碼 完整計算</p>
+            <p>B/C碼・D碼・G碼・SC碼・EF碼 完整計算</p>
         </header>
 
         <!-- Step 1: CMS等級 -->
@@ -935,11 +991,13 @@
             <div class="tabs">
                 <button class="tab-btn tab-bc active" data-tab="bc">B/C碼</button>
                 <button class="tab-btn tab-g" data-tab="g">G/SC碼</button>
+                <button class="tab-btn tab-ef" data-tab="ef">EF碼 輔具</button>
             </div>
 
             <div id="bcContainer"></div>
             <div id="gContainer" class="hidden"></div>
             <div id="scContainer" class="hidden"></div>
+            <div id="efContainer" class="hidden"></div>
 
             <div class="info-note" id="foreignNote" style="display:none;">
                 <strong>⚠️ 外籍看護：</strong>B/C碼僅30%額度，限C碼及BA09/BA09a/BD03。D碼/G碼不受影響，另可使用SC碼短照服務。
@@ -972,6 +1030,15 @@
             </div>
             <div class="calc-detail-content open" id="scCalcContent"></div>
             <div class="calc-subtotal" id="scSubtotal"></div>
+        </div>
+
+        <div id="efCalcDetail" class="calc-detail ef-detail hidden">
+            <div class="calc-detail-header" id="efCalcToggle">
+                <span class="calc-detail-title">EF碼 輔具服務 計算明細</span>
+                <span class="calc-detail-toggle open">▼</span>
+            </div>
+            <div class="calc-detail-content open" id="efCalcContent"></div>
+            <div class="calc-subtotal" id="efSubtotal"></div>
         </div>
 
         <!-- 總計 -->
@@ -1193,6 +1260,225 @@
             ]},
         ];
 
+        // EF碼 輔具服務
+        const EF_QUOTA = 40000; // 每三年額度
+        const EF_COPAY_RATES = {
+            low: 0,      // 低收入戶 0%
+            midLow: 10,  // 中低收入戶 10%
+            general: 30  // 一般戶 30%
+        };
+
+        // EF碼購置項目
+        const EF_PURCHASE_SERVICES = [
+            { category: 'EA 衛浴輔具', items: [
+                { code: 'EA01', name: '馬桶增高器、便盆椅、沐浴椅', maxPrice: 1200,
+                  priceByIdentity: { low: 1200, midLow: 1080, general: 840 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 1 }
+            ]},
+            { category: 'EB 行動輔具（拐杖/助行器）', items: [
+                { code: 'EB01', name: '單支拐杖-不銹鋼製', maxPrice: 1000,
+                  priceByIdentity: { low: 1000, midLow: 900, general: 700 },
+                  minYear: 5, needEval: false, freePartial: false, canRent: false, maxQty: 2,
+                  note: '雙側使用額度加倍' },
+                { code: 'EB02', name: '單支拐杖-鋁製', maxPrice: 500,
+                  priceByIdentity: { low: 500, midLow: 450, general: 350 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 2,
+                  note: '雙側使用額度加倍' },
+                { code: 'EB03', name: '助行器', maxPrice: 800,
+                  priceByIdentity: { low: 800, midLow: 720, general: 560 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'EB04', name: '帶輪型助步車(助行椅)', maxPrice: 3000,
+                  priceByIdentity: { low: 3000, midLow: 2700, general: 2100 },
+                  minYear: 3, needEval: true, freePartial: false, canRent: true, maxQty: 1 }
+            ]},
+            { category: 'EC 輪椅及附件', items: [
+                { code: 'EC01', name: '輪椅-A款(非輕量化量產型)', maxPrice: 3500,
+                  priceByIdentity: { low: 3500, midLow: 3150, general: 2450 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 1,
+                  note: 'EC01/EC02/EC03三款擇一' },
+                { code: 'EC02', name: '輪椅-B款(輕量化量產型)', maxPrice: 4000,
+                  priceByIdentity: { low: 4000, midLow: 3600, general: 2800 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: true, maxQty: 1,
+                  note: 'EC01/EC02/EC03三款擇一' },
+                { code: 'EC03', name: '輪椅-C款(量身訂製型)', maxPrice: 9000,
+                  priceByIdentity: { low: 9000, midLow: 9000, general: 9000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 1,
+                  note: 'EC01/EC02/EC03三款擇一' },
+                { code: 'EC04', name: '輪椅附加功能-A款(具利於移位功能)', maxPrice: 5000,
+                  priceByIdentity: { low: 5000, midLow: 5000, general: 5000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: true, maxQty: 1,
+                  note: '須搭配EC02或EC03' },
+                { code: 'EC05', name: '輪椅附加功能-B款(具仰躺功能)', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 2000, general: 2000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: true, maxQty: 1,
+                  note: '須搭配EC02或EC03' },
+                { code: 'EC06', name: '輪椅附加功能-C款(具空中傾倒功能)', maxPrice: 4000,
+                  priceByIdentity: { low: 4000, midLow: 4000, general: 4000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: true, maxQty: 1,
+                  note: '須搭配EC02或EC03' },
+                { code: 'EC07', name: '擺位系統-A款(平面型輪椅背靠)', maxPrice: 1000,
+                  priceByIdentity: { low: 1000, midLow: 1000, general: 1000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 1,
+                  note: 'EC07/EC08擇一' },
+                { code: 'EC08', name: '擺位系統-B款(曲面適形輪椅背靠)', maxPrice: 6000,
+                  priceByIdentity: { low: 6000, midLow: 6000, general: 6000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 1,
+                  note: 'EC07/EC08擇一' },
+                { code: 'EC09', name: '擺位系統-C款(輪椅軀幹側支撐架)', maxPrice: 3000,
+                  priceByIdentity: { low: 3000, midLow: 3000, general: 3000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 2,
+                  note: '單支減半補助1500元' },
+                { code: 'EC10', name: '擺位系統-D款(輪椅頭靠系統)', maxPrice: 2500,
+                  priceByIdentity: { low: 2500, midLow: 2500, general: 2500 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 1 }
+            ]},
+            { category: 'ED 移位輔具', items: [
+                { code: 'ED01', name: '移位腰帶', maxPrice: 1500,
+                  priceByIdentity: { low: 1500, midLow: 1350, general: 1050 },
+                  minYear: 3, needEval: true, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'ED02', name: '移位板', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 5, needEval: true, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'ED03', name: '人力移位吊帶', maxPrice: 4000,
+                  priceByIdentity: { low: 4000, midLow: 3600, general: 2800 },
+                  minYear: 3, needEval: true, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'ED04', name: '移位滑墊-A款', maxPrice: 3000,
+                  priceByIdentity: { low: 3000, midLow: 2700, general: 2100 },
+                  minYear: 5, needEval: true, freePartial: false, canRent: false, maxQty: 1,
+                  note: '坐姿用，寬長≥50cm' },
+                { code: 'ED05', name: '移位滑墊-B款', maxPrice: 8000,
+                  priceByIdentity: { low: 8000, midLow: 7200, general: 5600 },
+                  minYear: 5, needEval: true, freePartial: false, canRent: false, maxQty: 1,
+                  note: '臥姿用，寬≥45cm長≥170cm' },
+                { code: 'ED06', name: '移位轉盤', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 3, needEval: true, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'ED07', name: '移位機', maxPrice: 40000,
+                  priceByIdentity: { low: 40000, midLow: 36000, general: 28000 },
+                  minYear: 10, needEval: true, freePartial: false, canRent: true, maxQty: 1,
+                  note: '懸吊式電動移位設備，含吊帶' },
+                { code: 'ED08', name: '移位機吊帶', maxPrice: 6000,
+                  priceByIdentity: { low: 6000, midLow: 5400, general: 4200 },
+                  minYear: 3, needEval: true, freePartial: false, canRent: false, maxQty: 1,
+                  note: '適用ED07購置3年後吊帶更換' }
+            ]},
+            { category: 'EE 聽覺警示輔具', items: [
+                { code: 'EE01', name: '電話擴音器', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 5, needEval: false, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'EE02', name: '電話閃光震動器', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 5, needEval: false, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'EE03', name: '火警閃光警示器', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 5, needEval: false, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'EE04', name: '門鈴閃光器', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 5, needEval: false, freePartial: false, canRent: false, maxQty: 1 },
+                { code: 'EE05', name: '無線震動警示器', maxPrice: 2000,
+                  priceByIdentity: { low: 2000, midLow: 1800, general: 1400 },
+                  minYear: 5, needEval: false, freePartial: false, canRent: false, maxQty: 1 }
+            ]},
+            { category: 'EF 生活輔具', items: [
+                { code: 'EF01', name: '衣著用輔具', maxPrice: 500,
+                  priceByIdentity: { low: 500, midLow: 450, general: 350 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 1,
+                  note: '穿衣桿、穿鞋器、襪輔助器、長柄取物鉗' },
+                { code: 'EF02', name: '居家用生活輔具', maxPrice: 500,
+                  priceByIdentity: { low: 500, midLow: 450, general: 350 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 1,
+                  note: '特殊門把、烹調用具、開瓶罐器、備藥提醒' },
+                { code: 'EF03', name: '飲食用輔具', maxPrice: 500,
+                  priceByIdentity: { low: 500, midLow: 450, general: 350 },
+                  minYear: 3, needEval: false, freePartial: false, canRent: false, maxQty: 1,
+                  note: '特殊刀叉湯匙筷子、杯盤、防滑墊' }
+            ]},
+            { category: 'EG 減壓輔具（氣墊床/座墊）', items: [
+                { code: 'EG01', name: '氣墊床-A款', maxPrice: 8000,
+                  priceByIdentity: { low: 8000, midLow: 8000, general: 8000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: true, maxQty: 1,
+                  note: '18管以上交替充氣' },
+                { code: 'EG02', name: '氣墊床-B款', maxPrice: 12000,
+                  priceByIdentity: { low: 12000, midLow: 12000, general: 12000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: true, maxQty: 1,
+                  note: '4吋以上管徑、三管交替、CPR快速洩氣閥' },
+                { code: 'EG03', name: '輪椅座墊-A款(連通管型氣囊氣墊座-塑膠)', maxPrice: 5000,
+                  priceByIdentity: { low: 5000, midLow: 5000, general: 5000 },
+                  minYear: 2, needEval: true, freePartial: true, canRent: false, maxQty: 1 },
+                { code: 'EG04', name: '輪椅座墊-B款(連通管型氣囊氣墊座-橡膠)', maxPrice: 10000,
+                  priceByIdentity: { low: 10000, midLow: 10000, general: 10000 },
+                  minYear: 2, needEval: true, freePartial: true, canRent: false, maxQty: 1 },
+                { code: 'EG05', name: '輪椅座墊-C款(液態凝膠座墊)', maxPrice: 10000,
+                  priceByIdentity: { low: 10000, midLow: 10000, general: 10000 },
+                  minYear: 2, needEval: true, freePartial: true, canRent: false, maxQty: 1 },
+                { code: 'EG06', name: '輪椅座墊-D款(固態凝膠座墊)', maxPrice: 8000,
+                  priceByIdentity: { low: 8000, midLow: 8000, general: 8000 },
+                  minYear: 5, needEval: true, freePartial: true, canRent: false, maxQty: 1 },
+                { code: 'EG07', name: '輪椅座墊-E款(填充式氣囊氣墊座)', maxPrice: 8000,
+                  priceByIdentity: { low: 8000, midLow: 8000, general: 8000 },
+                  minYear: 5, needEval: true, freePartial: true, canRent: false, maxQty: 1 },
+                { code: 'EG08', name: '輪椅座墊-F款(交替充氣型座墊)', maxPrice: 5000,
+                  priceByIdentity: { low: 5000, midLow: 5000, general: 5000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 1 },
+                { code: 'EG09', name: '輪椅座墊-G款(量製型座墊)', maxPrice: 10000,
+                  priceByIdentity: { low: 10000, midLow: 10000, general: 10000 },
+                  minYear: 3, needEval: true, freePartial: true, canRent: false, maxQty: 1 }
+            ]},
+            { category: 'EH 居家照顧床', items: [
+                { code: 'EH01', name: '居家用照顧床', maxPrice: 8000,
+                  priceByIdentity: { low: 8000, midLow: 7200, general: 5600 },
+                  minYear: 5, needEval: true, freePartial: false, canRent: true, maxQty: 1,
+                  note: '三片以上床面設計' },
+                { code: 'EH02', name: '居家用照顧床-附加功能A款(床面升降功能)', maxPrice: 5000,
+                  priceByIdentity: { low: 5000, midLow: 4500, general: 3500 },
+                  minYear: 5, needEval: true, freePartial: false, canRent: true, maxQty: 1,
+                  note: '須搭配EH01' },
+                { code: 'EH03', name: '居家用照顧床-附加功能B款(電動升降功能)', maxPrice: 5000,
+                  priceByIdentity: { low: 5000, midLow: 4500, general: 3500 },
+                  minYear: 5, needEval: true, freePartial: false, canRent: true, maxQty: 1,
+                  note: '須搭配EH01' }
+            ]}
+        ];
+
+        // EF碼租賃項目（月租）
+        const EF_RENTAL_SERVICES = [
+            { category: '可租賃輔具（月租）', items: [
+                { code: 'EB04-R', name: '帶輪型助步車(助行椅)-租賃', maxPrice: 300,
+                  priceByIdentity: { low: 300, midLow: 270, general: 210 },
+                  needEval: true, isRental: true, maxQty: 12 },
+                { code: 'EC02-R', name: '輪椅-B款(輕量化量產型)-租賃', maxPrice: 500,
+                  priceByIdentity: { low: 500, midLow: 450, general: 350 },
+                  needEval: false, isRental: true, maxQty: 12 },
+                { code: 'EC04-R', name: '輪椅附加功能-A款-租賃', maxPrice: 600,
+                  priceByIdentity: { low: 600, midLow: 600, general: 600 },
+                  needEval: true, isRental: true, freePartial: true, maxQty: 12 },
+                { code: 'EC05-R', name: '輪椅附加功能-B款-租賃', maxPrice: 300,
+                  priceByIdentity: { low: 300, midLow: 300, general: 300 },
+                  needEval: true, isRental: true, freePartial: true, maxQty: 12 },
+                { code: 'EC06-R', name: '輪椅附加功能-C款-租賃', maxPrice: 400,
+                  priceByIdentity: { low: 400, midLow: 400, general: 400 },
+                  needEval: true, isRental: true, freePartial: true, maxQty: 12 },
+                { code: 'ED07-R', name: '移位機-租賃', maxPrice: 3000,
+                  priceByIdentity: { low: 3000, midLow: 2700, general: 2100 },
+                  needEval: true, isRental: true, maxQty: 12 },
+                { code: 'EG01-R', name: '氣墊床-A款-租賃', maxPrice: 700,
+                  priceByIdentity: { low: 700, midLow: 700, general: 700 },
+                  needEval: true, isRental: true, freePartial: true, maxQty: 12 },
+                { code: 'EG02-R', name: '氣墊床-B款-租賃', maxPrice: 1000,
+                  priceByIdentity: { low: 1000, midLow: 1000, general: 1000 },
+                  needEval: true, isRental: true, freePartial: true, maxQty: 12 },
+                { code: 'EH01-R', name: '居家用照顧床-租賃', maxPrice: 1000,
+                  priceByIdentity: { low: 1000, midLow: 900, general: 700 },
+                  needEval: true, isRental: true, maxQty: 12 },
+                { code: 'EH02-R', name: '照顧床-附加功能A款-租賃', maxPrice: 400,
+                  priceByIdentity: { low: 400, midLow: 360, general: 280 },
+                  needEval: true, isRental: true, maxQty: 12 },
+                { code: 'EH03-R', name: '照顧床-附加功能B款-租賃', maxPrice: 400,
+                  priceByIdentity: { low: 400, midLow: 360, general: 280 },
+                  needEval: true, isRental: true, maxQty: 12 }
+            ]}
+        ];
+
         // ===== 狀態 =====
         let state = {
             cmsLevel: null,
@@ -1201,10 +1487,11 @@
             quantities: {},
             expanded: {},
             activeTab: 'bc',
-            calcExpanded: { bc: true, g: true, sc: true }
+            efMode: 'purchase', // 'purchase' or 'rental'
+            calcExpanded: { bc: true, g: true, sc: true, ef: true }
         };
 
-        [...B_SERVICES, ...C_SERVICES, ...G_SERVICES, ...SC_SERVICES].forEach(cat => {
+        [...B_SERVICES, ...C_SERVICES, ...G_SERVICES, ...SC_SERVICES, ...EF_PURCHASE_SERVICES, ...EF_RENTAL_SERVICES].forEach(cat => {
             state.expanded[cat.category] = false;
         });
 
@@ -1263,6 +1550,23 @@
             return SC_SERVICES.flatMap(c => c.items);
         }
 
+        function getAllEfPurchaseServices() {
+            return EF_PURCHASE_SERVICES.flatMap(c => c.items);
+        }
+
+        function getAllEfRentalServices() {
+            return EF_RENTAL_SERVICES.flatMap(c => c.items);
+        }
+
+        function getAllEfServices() {
+            return [...getAllEfPurchaseServices(), ...getAllEfRentalServices()];
+        }
+
+        function getEfItemPrice(item, identity) {
+            if (!identity) return item.maxPrice;
+            return item.priceByIdentity[identity] || item.maxPrice;
+        }
+
         function updateStepIndicators() {
             const step1 = $('step1');
             const step2 = $('step2');
@@ -1315,21 +1619,22 @@
             }
 
             let html = '<span class="summary-tag">CMS ' + state.cmsLevel + '級</span>';
-            
+
             let quotaBc = CMS_BC_QUOTA[state.cmsLevel];
             if (state.hasForeign) quotaBc = Math.floor(quotaBc * 0.3);
-            
+
             html += '<span class="summary-tag">B/C額度 $' + quotaBc.toLocaleString() + '</span>';
             html += '<span class="summary-tag">G額度 $' + CMS_G_QUOTA[state.cmsLevel].toLocaleString() + '</span>';
-            
+            html += '<span class="summary-tag" style="color:#10b981;">EF額度 $' + EF_QUOTA.toLocaleString() + '/3年</span>';
+
             if (state.hasForeign) {
                 html += '<span class="summary-tag" style="color:#22d3ee;">SC額度 $' + CMS_SC_QUOTA[state.cmsLevel].toLocaleString() + '</span>';
             }
-            
+
             if (state.identity) {
                 html += '<span class="summary-tag">' + IDENTITY_NAMES[state.identity] + '</span>';
             }
-            
+
             if (state.hasForeign) {
                 html += '<span class="summary-tag orange">外籍看護</span>';
             }
@@ -1486,6 +1791,7 @@
             renderServiceList([...B_SERVICES, ...C_SERVICES], 'bcContainer', 'bc-header');
             renderServiceList(G_SERVICES, 'gContainer', 'g-header');
             renderScServices();
+            renderEfServices();
         }
         
         // SC碼單獨渲染（帶鎖定邏輯）
@@ -1588,6 +1894,131 @@
             });
         }
 
+        // EF碼渲染
+        function renderEfServices() {
+            const container = $('efContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            // 模式切換按鈕
+            const modeToggle = document.createElement('div');
+            modeToggle.className = 'ef-mode-toggle';
+            modeToggle.innerHTML =
+                '<button class="ef-mode-btn ' + (state.efMode === 'purchase' ? 'active' : '') + '" data-mode="purchase">購置</button>' +
+                '<button class="ef-mode-btn ' + (state.efMode === 'rental' ? 'active' : '') + '" data-mode="rental">租賃</button>';
+            container.appendChild(modeToggle);
+
+            modeToggle.querySelectorAll('.ef-mode-btn').forEach(btn => {
+                btn.onclick = function() {
+                    state.efMode = this.getAttribute('data-mode');
+                    renderEfServices();
+                    calculate();
+                };
+            });
+
+            // 說明
+            const infoNote = document.createElement('div');
+            infoNote.className = 'info-note';
+            infoNote.style.marginBottom = '12px';
+            if (state.efMode === 'purchase') {
+                infoNote.innerHTML = '<strong>購置輔具：</strong>每三年額度 $' + EF_QUOTA.toLocaleString() + '，事前申請制。' +
+                    (state.identity ? ' 部分負擔 ' + EF_COPAY_RATES[state.identity] + '%（免部分負擔項目除外）' : '');
+            } else {
+                infoNote.innerHTML = '<strong>租賃輔具：</strong>按月計費，由三年額度扣除。' +
+                    (state.identity ? ' 部分負擔 ' + EF_COPAY_RATES[state.identity] + '%（免部分負擔項目除外）' : '');
+            }
+            container.appendChild(infoNote);
+
+            // 服務列表
+            const services = state.efMode === 'purchase' ? EF_PURCHASE_SERVICES : EF_RENTAL_SERVICES;
+
+            services.forEach(category => {
+                const items = category.items;
+                if (items.length === 0) return;
+
+                const section = document.createElement('div');
+                section.className = 'service-section';
+                const isOpen = state.expanded[category.category];
+
+                section.innerHTML =
+                    '<div class="collapse-header" data-cat="' + category.category + '">' +
+                    '<h3 class="ef-header">' + category.category + '</h3>' +
+                    '<span class="collapse-icon ' + (isOpen ? 'open' : '') + '">▼</span>' +
+                    '</div>' +
+                    '<div class="collapse-content ' + (isOpen ? 'open' : '') + '">' +
+                    '<div class="service-list"></div>' +
+                    '</div>';
+
+                const list = section.querySelector('.service-list');
+                items.forEach(item => {
+                    const qty = state.quantities[item.code] || 0;
+                    const maxQty = item.maxQty || 1;
+                    const price = getEfItemPrice(item, state.identity);
+
+                    const div = document.createElement('div');
+                    div.className = 'service-item ef-item';
+
+                    // 標籤
+                    let tagsHtml = '<div class="item-tags">';
+                    if (item.needEval) tagsHtml += '<span class="item-tag tag-eval">須評估</span>';
+                    if (item.freePartial) tagsHtml += '<span class="item-tag tag-free">免部分負擔</span>';
+                    if (item.canRent && state.efMode === 'purchase') tagsHtml += '<span class="item-tag tag-rent">可租賃</span>';
+                    if (item.isRental) tagsHtml += '<span class="item-tag tag-rent">月租</span>';
+                    if (item.minYear) tagsHtml += '<span class="item-tag">年限' + item.minYear + '年</span>';
+                    tagsHtml += '</div>';
+
+                    const unitText = item.isRental ? '/月' : '';
+                    const showPlus5 = maxQty > 1;
+
+                    div.innerHTML =
+                        '<div class="service-info">' +
+                        '<div class="service-name">' +
+                        '<span class="service-code ef-code">' + item.code + '</span>' + item.name +
+                        '</div>' +
+                        '<div class="service-price">補助 $' + price.toLocaleString() + unitText + (item.freePartial ? '' : ' (自付' + (state.identity ? EF_COPAY_RATES[state.identity] : 30) + '%)') + '</div>' +
+                        tagsHtml +
+                        (item.note ? '<div class="service-note">' + item.note + '</div>' : '') +
+                        '</div>' +
+                        '<div class="service-controls">' +
+                        '<button class="qty-btn minus" data-code="' + item.code + '">−</button>' +
+                        '<span class="qty-display ' + (qty > 0 ? 'has-value' : '') + '">' + qty + '</span>' +
+                        '<button class="qty-btn plus" data-code="' + item.code + '" data-max="' + maxQty + '" ' + (qty >= maxQty ? 'disabled' : '') + '>+</button>' +
+                        (showPlus5 ? '<button class="qty-btn plus5" data-code="' + item.code + '" data-max="' + maxQty + '" ' + (qty >= maxQty ? 'disabled' : '') + '>+5</button>' : '') +
+                        '</div>';
+
+                    list.appendChild(div);
+                });
+
+                // 設定展開/收合
+                section.querySelector('.collapse-header').onclick = function () {
+                    const cat = this.getAttribute('data-cat');
+                    state.expanded[cat] = !state.expanded[cat];
+                    this.querySelector('.collapse-icon').classList.toggle('open');
+                    this.nextElementSibling.classList.toggle('open');
+                };
+
+                // 數量按鈕
+                section.querySelectorAll('.qty-btn').forEach(btn => {
+                    btn.onclick = function () {
+                        if (this.disabled) return;
+                        const code = this.getAttribute('data-code');
+                        const max = parseInt(this.getAttribute('data-max')) || 1;
+                        let delta = 0;
+                        if (this.classList.contains('minus')) delta = -1;
+                        else if (this.classList.contains('plus')) delta = 1;
+                        else if (this.classList.contains('plus5')) delta = 5;
+
+                        state.quantities[code] = Math.max(0, Math.min(max, (state.quantities[code] || 0) + delta));
+                        renderEfServices();
+                        calculate();
+                    };
+                });
+
+                container.appendChild(section);
+            });
+        }
+
         // ===== 計算 =====
         function calculate() {
             if (!state.cmsLevel || !state.identity) return;
@@ -1654,10 +2085,50 @@
             const quotaG = CMS_G_QUOTA[state.cmsLevel];
             const quotaSc = state.hasForeign ? CMS_SC_QUOTA[state.cmsLevel] : 0;
 
+            // EF碼計算
+            const efPurchaseItems = getAllEfPurchaseServices();
+            const efRentalItems = getAllEfRentalServices();
+            const rateEf = EF_COPAY_RATES[state.identity] / 100;
+
+            let efTotal = 0;
+            const efSelected = [];
+
+            Object.entries(state.quantities).forEach(([code, qty]) => {
+                if (qty <= 0) return;
+
+                // 購置項目
+                let item = efPurchaseItems.find(s => s.code === code);
+                if (item) {
+                    const price = getEfItemPrice(item, state.identity);
+                    const subtotal = price * qty;
+                    const isFree = item.freePartial;
+                    const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
+                    const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
+                    efTotal += subtotal;
+                    efSelected.push({ ...item, price, qty, subtotal, copayUnit, copayTotal, isFree, isRental: false });
+                    return;
+                }
+
+                // 租賃項目
+                item = efRentalItems.find(s => s.code === code);
+                if (item) {
+                    const price = getEfItemPrice(item, state.identity);
+                    const subtotal = price * qty;
+                    const isFree = item.freePartial;
+                    const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
+                    const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
+                    efTotal += subtotal;
+                    efSelected.push({ ...item, price, qty, subtotal, copayUnit, copayTotal, isFree, isRental: true });
+                }
+            });
+
+            const quotaEf = EF_QUOTA;
+
             renderBcCalcDetail(bcSelected, bcTotal, quotaBc, rateBc);
             renderGCalcDetail(gSelected, gTotal, quotaG, rateG);
             renderScCalcDetail(scSelected, scTotal, quotaSc, rateSc);
-            renderGrandTotal(bcTotal, gTotal, scTotal, quotaBc, quotaG, quotaSc, rateBc, rateG, rateSc);
+            renderEfCalcDetail(efSelected, efTotal, quotaEf, rateEf);
+            renderGrandTotal(bcTotal, gTotal, scTotal, efTotal, quotaBc, quotaG, quotaSc, quotaEf, rateBc, rateG, rateSc, rateEf, efSelected);
         }
 
         function renderBcCalcDetail(selected, total, quota, rate) {
@@ -1789,7 +2260,7 @@
             const copayLabel = total <= quota 
                 ? '自負 $' + totalCopay.toLocaleString()
                 : '自負 $' + totalCopay.toLocaleString() + '（含超額）';
-            subtotalEl.innerHTML = 
+            subtotalEl.innerHTML =
                 '<span class="calc-subtotal-label">SC碼合計</span>' +
                 '<span class="calc-subtotal-value">' +
                 '<span class="amount">$' + total.toLocaleString() + '</span>' +
@@ -1797,7 +2268,60 @@
                 '</span>';
         }
 
-        function renderGrandTotal(bcTotal, gTotal, scTotal, quotaBc, quotaG, quotaSc, rateBc, rateG, rateSc) {
+        function renderEfCalcDetail(selected, total, quota, rate) {
+            const detail = $('efCalcDetail');
+            const content = $('efCalcContent');
+            const subtotalEl = $('efSubtotal');
+
+            if (!detail) return;
+
+            if (selected.length === 0) {
+                detail.classList.add('hidden');
+                return;
+            }
+
+            detail.classList.remove('hidden');
+
+            content.innerHTML = selected.map(item => {
+                const copayText = item.isFree ? '(免部分負擔)' : '自負 $' + item.copayUnit.toLocaleString();
+                const copayTotalText = item.isFree ? '(免部分負擔)' : '自負 $' + item.copayTotal.toLocaleString();
+                const unitText = item.isRental ? '月' : '件';
+
+                return '<div class="calc-item">' +
+                    '<div class="calc-item-header">' +
+                    '<span class="calc-item-name"><span class="code">' + item.code + '</span>' + item.name + (item.isRental ? ' (租賃)' : '') + '</span>' +
+                    '<span class="calc-item-qty">× ' + item.qty + unitText + '</span>' +
+                    '</div>' +
+                    '<div class="calc-item-rows">' +
+                    '<div class="calc-row">' +
+                    '<span class="calc-row-label">補助金額' + (item.isRental ? '/月' : '') + '</span>' +
+                    '<span class="calc-row-value">$' + item.price.toLocaleString() + '<span class="copay">' + copayText + '</span></span>' +
+                    '</div>' +
+                    '<div class="calc-row">' +
+                    '<span class="calc-row-label">小計</span>' +
+                    '<span class="calc-row-value">$' + item.subtotal.toLocaleString() + '<span class="copay">' + copayTotalText + '</span></span>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+
+            // 計算總部分負擔（考慮免部分負擔項目）
+            const totalCopay = selected.reduce((sum, item) => sum + item.copayTotal, 0);
+            const overQuota = total > quota ? total - quota : 0;
+            const finalCopay = overQuota > 0 ? totalCopay + overQuota : totalCopay;
+            const copayLabel = total <= quota
+                ? '自負 $' + totalCopay.toLocaleString()
+                : '自負 $' + finalCopay.toLocaleString() + '（含超額' + overQuota.toLocaleString() + '元）';
+
+            subtotalEl.innerHTML =
+                '<span class="calc-subtotal-label">EF碼合計（三年額度 $' + quota.toLocaleString() + '）</span>' +
+                '<span class="calc-subtotal-value">' +
+                '<span class="amount">$' + total.toLocaleString() + '</span>' +
+                '<span class="copay">' + copayLabel + '</span>' +
+                '</span>';
+        }
+
+        function renderGrandTotal(bcTotal, gTotal, scTotal, efTotal, quotaBc, quotaG, quotaSc, quotaEf, rateBc, rateG, rateSc, rateEf, efSelected) {
             const content = $('grandTotalContent');
             
             // B/C碼部分負擔計算（超額部分算100%）
@@ -1912,12 +2436,48 @@
                     '</div>';
             }
 
+            // EF碼區塊
+            const efRemain = quotaEf - efTotal;
+            // EF碼部分負擔計算（考慮免部分負擔項目）
+            let efCopay = 0;
+            let efCopayLabel = '';
+            if (efSelected && efSelected.length > 0) {
+                efCopay = efSelected.reduce((sum, item) => sum + item.copayTotal, 0);
+                if (efTotal <= quotaEf) {
+                    efCopayLabel = 'EF碼 部分負擔（' + (rateEf * 100) + '%，免部分負擔項目除外）';
+                } else {
+                    const overQuota = efTotal - quotaEf;
+                    efCopay += overQuota;
+                    efCopayLabel = 'EF碼 部分負擔（含超額' + overQuota.toLocaleString() + '元）';
+                }
+            } else {
+                efCopayLabel = 'EF碼 部分負擔（' + (rateEf * 100) + '%）';
+            }
+
+            html +=
+                '<div class="grand-total-row" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">' +
+                '<span class="grand-total-label" style="color:#10b981;">EF碼 三年額度（輔具）</span>' +
+                '<span class="grand-total-value">' + quotaEf.toLocaleString() + ' 元</span>' +
+                '</div>' +
+                '<div class="grand-total-row">' +
+                '<span class="grand-total-label">EF碼 已使用</span>' +
+                '<span class="grand-total-value total">' + efTotal.toLocaleString() + ' 元</span>' +
+                '</div>' +
+                '<div class="grand-total-row">' +
+                '<span class="grand-total-label">EF碼 剩餘</span>' +
+                '<span class="grand-total-value ' + (efRemain >= 0 ? 'remain' : 'negative') + '">' + efRemain.toLocaleString() + ' 元</span>' +
+                '</div>' +
+                '<div class="grand-total-row">' +
+                '<span class="grand-total-label">' + efCopayLabel + '</span>' +
+                '<span class="grand-total-value copay">' + efCopay.toLocaleString() + ' 元</span>' +
+                '</div>';
+
             html +=
                 '<div class="grand-total-row main">' +
                 '<span class="grand-total-label">總部分負擔</span>' +
-                '<span class="grand-total-value copay">' + (bcCopay + dCopay + gCopay + scCopay).toLocaleString() + ' 元</span>' +
+                '<span class="grand-total-value copay">' + (bcCopay + dCopay + gCopay + scCopay + efCopay).toLocaleString() + ' 元</span>' +
                 '</div>';
-            
+
             content.innerHTML = html;
         }
 
@@ -1934,6 +2494,7 @@
                     $('bcContainer').classList.toggle('hidden', tab !== 'bc');
                     $('gContainer').classList.toggle('hidden', tab !== 'g');
                     $('scContainer').classList.toggle('hidden', tab !== 'g');
+                    $('efContainer').classList.toggle('hidden', tab !== 'ef');
                 };
             });
         }
@@ -1954,6 +2515,12 @@
             $('scCalcToggle').onclick = function() {
                 state.calcExpanded.sc = !state.calcExpanded.sc;
                 $('scCalcContent').classList.toggle('open');
+                this.querySelector('.calc-detail-toggle').classList.toggle('open');
+            };
+
+            $('efCalcToggle').onclick = function() {
+                state.calcExpanded.ef = !state.calcExpanded.ef;
+                $('efCalcContent').classList.toggle('open');
                 this.querySelector('.calc-detail-toggle').classList.toggle('open');
             };
         }
@@ -1988,6 +2555,8 @@
                 $('bcCalcDetail').classList.add('hidden');
                 $('gCalcDetail').classList.add('hidden');
                 $('scCalcDetail').classList.add('hidden');
+                $('efCalcDetail').classList.add('hidden');
+                state.efMode = 'purchase';
                 $('grandTotalContent').innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;font-size:0.85rem;">請先選擇 CMS 等級與身份別</div>';
                 
                 renderCMS();
@@ -2007,18 +2576,23 @@
                 const bcItems = getAllBcServices();
                 const gItems = getAllGServices();
                 const scItems = getAllScServices();
+                const efPurchaseItems = getAllEfPurchaseServices();
+                const efRentalItems = getAllEfRentalServices();
                 const rateBc = COPAY_RATES.bc[state.identity] / 100;
                 const rateG = COPAY_RATES.g[state.identity] / 100;
                 const rateSc = COPAY_RATES.sc[state.identity] / 100;
                 const rateD = COPAY_RATES.d[state.identity] / 100;
+                const rateEf = EF_COPAY_RATES[state.identity] / 100;
 
                 let quotaBc = CMS_BC_QUOTA[state.cmsLevel];
                 if (state.hasForeign) quotaBc = Math.floor(quotaBc * 0.3);
                 const quotaG = CMS_G_QUOTA[state.cmsLevel];
                 const quotaSc = state.hasForeign ? CMS_SC_QUOTA[state.cmsLevel] : 0;
+                const quotaEf = EF_QUOTA;
 
-                let bcTotal = 0, gTotal = 0, scTotal = 0;
-                const bcLines = [], gLines = [], scLines = [];
+                let bcTotal = 0, gTotal = 0, scTotal = 0, efTotal = 0;
+                const bcLines = [], gLines = [], scLines = [], efLines = [];
+                let efCopaySum = 0;
 
                 Object.entries(state.quantities).forEach(([code, qty]) => {
                     if (qty <= 0) return;
@@ -2059,7 +2633,39 @@
                             scLines.push('• ' + code + ' ' + scItem.name);
                             scLines.push('  單價 $' + scItem.price.toLocaleString() + '（自負 $' + copayUnit.toLocaleString() + '）');
                             scLines.push('  ' + qty + '組 $' + subtotal.toLocaleString() + '（自負 $' + copayTotal.toLocaleString() + '）');
+                            return;
                         }
+                    }
+
+                    // EF碼購置
+                    let efItem = efPurchaseItems.find(s => s.code === code);
+                    if (efItem) {
+                        const price = getEfItemPrice(efItem, state.identity);
+                        const subtotal = price * qty;
+                        const isFree = efItem.freePartial;
+                        const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
+                        const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
+                        efTotal += subtotal;
+                        efCopaySum += copayTotal;
+                        efLines.push('• ' + code + ' ' + efItem.name);
+                        efLines.push('  補助 $' + price.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayUnit.toLocaleString() + '）'));
+                        efLines.push('  ' + qty + '件 $' + subtotal.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayTotal.toLocaleString() + '）'));
+                        return;
+                    }
+
+                    // EF碼租賃
+                    efItem = efRentalItems.find(s => s.code === code);
+                    if (efItem) {
+                        const price = getEfItemPrice(efItem, state.identity);
+                        const subtotal = price * qty;
+                        const isFree = efItem.freePartial;
+                        const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
+                        const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
+                        efTotal += subtotal;
+                        efCopaySum += copayTotal;
+                        efLines.push('• ' + code + ' ' + efItem.name + ' (租賃)');
+                        efLines.push('  月租 $' + price.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayUnit.toLocaleString() + '）'));
+                        efLines.push('  ' + qty + '月 $' + subtotal.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayTotal.toLocaleString() + '）'));
                     }
                 });
 
@@ -2155,8 +2761,30 @@
                     lines.push('');
                 }
 
+                // EF碼區塊
+                let efCopay = efCopaySum;
+                let efCopayText;
+                if (efTotal <= quotaEf) {
+                    efCopayText = '部分負擔：' + efCopay.toLocaleString() + '元（免部分負擔項目除外）';
+                } else {
+                    const overQuota = efTotal - quotaEf;
+                    efCopay += overQuota;
+                    efCopayText = '部分負擔（含超額' + overQuota.toLocaleString() + '元）：' + efCopay.toLocaleString() + '元';
+                }
+                lines.push('═══ EF碼 輔具服務 ═══');
+                lines.push('三年額度：' + quotaEf.toLocaleString() + '元');
+                if (efLines.length > 0) {
+                    lines.push('');
+                    lines.push(...efLines);
+                    lines.push('');
+                }
+                lines.push('已使用：' + efTotal.toLocaleString() + '元');
+                lines.push('剩餘：' + (quotaEf - efTotal).toLocaleString() + '元');
+                lines.push(efCopayText);
+                lines.push('');
+
                 lines.push('══════════════════');
-                lines.push('總部分負擔：' + (bcCopay + dCopay + gCopay + scCopay).toLocaleString() + '元');
+                lines.push('總部分負擔：' + (bcCopay + dCopay + gCopay + scCopay + efCopay).toLocaleString() + '元');
 
                 const text = lines.join('\n');
                 
@@ -2201,22 +2829,27 @@
                 const bcItems = getAllBcServices();
                 const gItems = getAllGServices();
                 const scItems = getAllScServices();
+                const efPurchaseItems = getAllEfPurchaseServices();
+                const efRentalItems = getAllEfRentalServices();
                 const rateBc = COPAY_RATES.bc[state.identity] / 100;
                 const rateG = COPAY_RATES.g[state.identity] / 100;
                 const rateSc = COPAY_RATES.sc[state.identity] / 100;
                 const rateD = COPAY_RATES.d[state.identity] / 100;
+                const rateEf = EF_COPAY_RATES[state.identity] / 100;
 
                 let quotaBc = CMS_BC_QUOTA[state.cmsLevel];
                 if (state.hasForeign) quotaBc = Math.floor(quotaBc * 0.3);
                 const quotaG = CMS_G_QUOTA[state.cmsLevel];
                 const quotaSc = state.hasForeign ? CMS_SC_QUOTA[state.cmsLevel] : 0;
+                const quotaEf = EF_QUOTA;
 
-                let bcTotal = 0, gTotal = 0, scTotal = 0;
-                const bcSelected = [], gSelected = [], scSelected = [];
+                let bcTotal = 0, gTotal = 0, scTotal = 0, efTotal = 0;
+                const bcSelected = [], gSelected = [], scSelected = [], efSelected = [];
+                let efCopaySum = 0;
 
                 Object.entries(state.quantities).forEach(([code, qty]) => {
                     if (qty <= 0) return;
-                    
+
                     const bcItem = bcItems.find(s => s.code === code);
                     if (bcItem && bcItem.price > 0) {
                         if (state.hasForeign && !isForeignAllowed(code)) return;
@@ -2241,7 +2874,33 @@
                             const subtotal = scItem.price * qty;
                             scTotal += subtotal;
                             scSelected.push({ ...scItem, qty, subtotal });
+                            return;
                         }
+                    }
+
+                    // EF碼購置
+                    let efItem = efPurchaseItems.find(s => s.code === code);
+                    if (efItem) {
+                        const price = getEfItemPrice(efItem, state.identity);
+                        const subtotal = price * qty;
+                        const isFree = efItem.freePartial;
+                        const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
+                        efTotal += subtotal;
+                        efCopaySum += copayTotal;
+                        efSelected.push({ ...efItem, price, qty, subtotal, isFree, copayTotal, isRental: false });
+                        return;
+                    }
+
+                    // EF碼租賃
+                    efItem = efRentalItems.find(s => s.code === code);
+                    if (efItem) {
+                        const price = getEfItemPrice(efItem, state.identity);
+                        const subtotal = price * qty;
+                        const isFree = efItem.freePartial;
+                        const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
+                        efTotal += subtotal;
+                        efCopaySum += copayTotal;
+                        efSelected.push({ ...efItem, price, qty, subtotal, isFree, copayTotal, isRental: true });
                     }
                 });
 
@@ -2281,7 +2940,6 @@
                 }
                 
                 const dCopay = Math.floor(D_QUOTA * rateD);
-                const totalCopay = bcCopay + dCopay + gCopay + scCopay;
 
                 const now = new Date();
                 const dateStr = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
@@ -2359,7 +3017,7 @@
                     html += '<div class="export-section">';
                     html += '<div class="export-section-title" style="color:#22d3ee;">SC碼 短照服務（年額度）</div>';
                     html += '<div class="export-row"><span class="export-row-label">年額度</span><span class="export-row-value">' + quotaSc.toLocaleString() + ' 元</span></div>';
-                    
+
                     if (scSelected.length > 0) {
                         scSelected.forEach(item => {
                             html += '<div class="export-item">';
@@ -2370,7 +3028,7 @@
                             html += '</div>';
                         });
                     }
-                    
+
                     html += '<div class="export-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">';
                     html += '<span class="export-row-label">已使用</span><span class="export-row-value highlight">' + scTotal.toLocaleString() + ' 元</span></div>';
                     html += '<div class="export-row"><span class="export-row-label">剩餘額度</span><span class="export-row-value ' + (quotaSc - scTotal >= 0 ? 'green' : 'red') + '">' + (quotaSc - scTotal).toLocaleString() + ' 元</span></div>';
@@ -2378,7 +3036,42 @@
                     html += '</div>';
                 }
 
+                // EF碼
+                let efCopay = efCopaySum;
+                let efCopayLabel;
+                if (efTotal <= quotaEf) {
+                    efCopayLabel = '部分負擔（免部分負擔項目除外）';
+                } else {
+                    const overQuota = efTotal - quotaEf;
+                    efCopay += overQuota;
+                    efCopayLabel = '部分負擔（含超額' + overQuota.toLocaleString() + '元）';
+                }
+
+                html += '<div class="export-section">';
+                html += '<div class="export-section-title" style="color:#10b981;">EF碼 輔具服務（三年額度）</div>';
+                html += '<div class="export-row"><span class="export-row-label">三年額度</span><span class="export-row-value">' + quotaEf.toLocaleString() + ' 元</span></div>';
+
+                if (efSelected.length > 0) {
+                    efSelected.forEach(item => {
+                        const unitText = item.isRental ? '月' : '件';
+                        const copayText = item.isFree ? '（免部分負擔）' : '（自負$' + item.copayTotal.toLocaleString() + '）';
+                        html += '<div class="export-item">';
+                        html += '<div class="export-item-header">';
+                        html += '<span class="export-item-name"><span class="code">' + item.code + '</span>' + item.name + (item.isRental ? ' (租賃)' : '') + '</span>';
+                        html += '</div>';
+                        html += '<div class="export-item-detail">$' + item.price.toLocaleString() + ' × ' + item.qty + unitText + ' = $' + item.subtotal.toLocaleString() + copayText + '</div>';
+                        html += '</div>';
+                    });
+                }
+
+                html += '<div class="export-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">';
+                html += '<span class="export-row-label">已使用</span><span class="export-row-value highlight">' + efTotal.toLocaleString() + ' 元</span></div>';
+                html += '<div class="export-row"><span class="export-row-label">剩餘額度</span><span class="export-row-value ' + (quotaEf - efTotal >= 0 ? 'green' : 'red') + '">' + (quotaEf - efTotal).toLocaleString() + ' 元</span></div>';
+                html += '<div class="export-row"><span class="export-row-label">' + efCopayLabel + '</span><span class="export-row-value orange">' + efCopay.toLocaleString() + ' 元</span></div>';
+                html += '</div>';
+
                 // 總計
+                const totalCopay = bcCopay + dCopay + gCopay + scCopay + efCopay;
                 html += '<div class="export-total">';
                 html += '<div class="export-total-row">';
                 html += '<span class="export-total-label">家屬需支付部分負擔</span>';
