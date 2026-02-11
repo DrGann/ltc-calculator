@@ -1079,23 +1079,23 @@
         };
 
         const BB_PRICES = {
-            2: { full: 675, half: 340 },
-            3: { full: 840, half: 420 },
-            4: { full: 920, half: 460 },
-            5: { full: 1045, half: 525 },
-            6: { full: 1130, half: 565 },
-            7: { full: 1210, half: 605 },
-            8: { full: 1285, half: 645 }
+            2: { full: 675, half: 340, fullCode: 'BB01', halfCode: 'BB02', fullName: '日間照顧(全日)第一型', halfName: '日間照顧(半日)第一型' },
+            3: { full: 840, half: 420, fullCode: 'BB03', halfCode: 'BB04', fullName: '日間照顧(全日)第二型', halfName: '日間照顧(半日)第二型' },
+            4: { full: 920, half: 460, fullCode: 'BB05', halfCode: 'BB06', fullName: '日間照顧(全日)第三型', halfName: '日間照顧(半日)第三型' },
+            5: { full: 1045, half: 525, fullCode: 'BB07', halfCode: 'BB08', fullName: '日間照顧(全日)第四型', halfName: '日間照顧(半日)第四型' },
+            6: { full: 1130, half: 565, fullCode: 'BB09', halfCode: 'BB10', fullName: '日間照顧(全日)第五型', halfName: '日間照顧(半日)第五型' },
+            7: { full: 1210, half: 605, fullCode: 'BB11', halfCode: 'BB12', fullName: '日間照顧(全日)第六型', halfName: '日間照顧(半日)第六型' },
+            8: { full: 1285, half: 645, fullCode: 'BB13', halfCode: 'BB14', fullName: '日間照顧(全日)第七型', halfName: '日間照顧(半日)第七型' }
         };
 
         const BC_PRICES = {
-            2: { full: 625, half: 315 },
-            3: { full: 760, half: 380 },
-            4: { full: 785, half: 395 },
-            5: { full: 880, half: 440 },
-            6: { full: 960, half: 480 },
-            7: { full: 980, half: 490 },
-            8: { full: 1040, half: 520 }
+            2: { full: 625, half: 315, fullCode: 'BC01', halfCode: 'BC02', fullName: '家庭托顧(全日)第一型', halfName: '家庭托顧(半日)第一型' },
+            3: { full: 760, half: 380, fullCode: 'BC03', halfCode: 'BC04', fullName: '家庭托顧(全日)第二型', halfName: '家庭托顧(半日)第二型' },
+            4: { full: 785, half: 395, fullCode: 'BC05', halfCode: 'BC06', fullName: '家庭托顧(全日)第三型', halfName: '家庭托顧(半日)第三型' },
+            5: { full: 880, half: 440, fullCode: 'BC07', halfCode: 'BC08', fullName: '家庭托顧(全日)第四型', halfName: '家庭托顧(半日)第四型' },
+            6: { full: 960, half: 480, fullCode: 'BC09', halfCode: 'BC10', fullName: '家庭托顧(全日)第五型', halfName: '家庭托顧(半日)第五型' },
+            7: { full: 980, half: 490, fullCode: 'BC11', halfCode: 'BC12', fullName: '家庭托顧(全日)第六型', halfName: '家庭托顧(半日)第六型' },
+            8: { full: 1040, half: 520, fullCode: 'BC13', halfCode: 'BC14', fullName: '家庭托顧(全日)第七型', halfName: '家庭托顧(半日)第七型' }
         };
 
         const COPAY_RATES = {
@@ -1532,11 +1532,28 @@
             return item.price;
         }
 
+        function getDynamicDisplay(code, cmsLevel) {
+            if (!cmsLevel) return null;
+            const map = {
+                'BB-full': () => ({ displayCode: BB_PRICES[cmsLevel].fullCode, displayName: BB_PRICES[cmsLevel].fullName }),
+                'BB-half': () => ({ displayCode: BB_PRICES[cmsLevel].halfCode, displayName: BB_PRICES[cmsLevel].halfName }),
+                'BC-full': () => ({ displayCode: BC_PRICES[cmsLevel].fullCode, displayName: BC_PRICES[cmsLevel].fullName }),
+                'BC-half': () => ({ displayCode: BC_PRICES[cmsLevel].halfCode, displayName: BC_PRICES[cmsLevel].halfName }),
+            };
+            return map[code] ? map[code]() : null;
+        }
+
         function getAllBcServices() {
             const result = [];
             [...B_SERVICES, ...C_SERVICES].forEach(cat => {
                 cat.items.forEach(item => {
-                    result.push({ ...item, price: getItemPrice(item) });
+                    const resolved = { ...item, price: getItemPrice(item) };
+                    const display = getDynamicDisplay(item.code, state.cmsLevel);
+                    if (display) {
+                        resolved.displayCode = display.displayCode;
+                        resolved.displayName = display.displayName;
+                    }
+                    result.push(resolved);
                 });
             });
             return result;
@@ -1717,8 +1734,11 @@
                     const isDisabled = state.hasForeign && codeType === 'bc' && !isForeignAllowed(item.code);
                     const qty = state.quantities[item.code] || 0;
                     const maxQty = item.maxQty || 999;
-                    
+
                     const price = getItemPrice(item);
+                    const display = getDynamicDisplay(item.code, state.cmsLevel);
+                    const showCode = display ? display.displayCode : item.code;
+                    const showName = display ? display.displayName : item.name;
 
                     const div = document.createElement('div');
                     let itemClass = '';
@@ -1742,7 +1762,7 @@
                     div.innerHTML =
                         '<div class="service-info">' +
                         '<div class="service-name">' +
-                        '<span class="service-code ' + codeClass + '">' + item.code + '</span>' + item.name +
+                        '<span class="service-code ' + codeClass + '">' + showCode + '</span>' + showName +
                         '</div>' +
                         '<div class="service-price">$' + price.toLocaleString() + (item.unit || '') + '</div>' +
                         (item.note ? '<div class="service-note">' + item.note + '</div>' : '') +
@@ -2143,11 +2163,11 @@
             }
 
             detail.classList.remove('hidden');
-            
-            content.innerHTML = selected.map(item => 
+
+            content.innerHTML = selected.map(item =>
                 '<div class="calc-item">' +
                 '<div class="calc-item-header">' +
-                '<span class="calc-item-name"><span class="code">' + item.code + '</span>' + item.name + '</span>' +
+                '<span class="calc-item-name"><span class="code">' + (item.displayCode || item.code) + '</span>' + (item.displayName || item.name) + '</span>' +
                 '<span class="calc-item-qty">× ' + item.qty + '</span>' +
                 '</div>' +
                 '<div class="calc-item-rows">' +
@@ -2971,7 +2991,7 @@
                     bcSelected.forEach(item => {
                         html += '<div class="export-item">';
                         html += '<div class="export-item-header">';
-                        html += '<span class="export-item-name"><span class="code">' + item.code + '</span>' + item.name + '</span>';
+                        html += '<span class="export-item-name"><span class="code">' + (item.displayCode || item.code) + '</span>' + (item.displayName || item.name) + '</span>';
                         html += '</div>';
                         html += '<div class="export-item-detail">$' + item.price.toLocaleString() + ' × ' + item.qty + '組 = $' + item.subtotal.toLocaleString() + '</div>';
                         html += '</div>';
