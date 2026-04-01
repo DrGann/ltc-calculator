@@ -2120,26 +2120,28 @@
                 // 購置項目
                 let item = efPurchaseItems.find(s => s.code === code);
                 if (item) {
-                    const price = getEfItemPrice(item, state.identity);
+                    const subsidy = getEfItemPrice(item, state.identity);
+                    const price = item.maxPrice;
                     const subtotal = price * qty;
                     const isFree = item.freePartial;
                     const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
                     const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
                     efTotal += subtotal;
-                    efSelected.push({ ...item, price, qty, subtotal, copayUnit, copayTotal, isFree, isRental: false });
+                    efSelected.push({ ...item, price, subsidy, qty, subtotal, copayUnit, copayTotal, isFree, isRental: false });
                     return;
                 }
 
                 // 租賃項目
                 item = efRentalItems.find(s => s.code === code);
                 if (item) {
-                    const price = getEfItemPrice(item, state.identity);
+                    const subsidy = getEfItemPrice(item, state.identity);
+                    const price = item.maxPrice;
                     const subtotal = price * qty;
                     const isFree = item.freePartial;
                     const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
                     const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
                     efTotal += subtotal;
-                    efSelected.push({ ...item, price, qty, subtotal, copayUnit, copayTotal, isFree, isRental: true });
+                    efSelected.push({ ...item, price, subsidy, qty, subtotal, copayUnit, copayTotal, isFree, isRental: true });
                 }
             });
 
@@ -2316,7 +2318,7 @@
                     '<div class="calc-item-rows">' +
                     '<div class="calc-row">' +
                     '<span class="calc-row-label">補助金額' + (item.isRental ? '/月' : '') + '</span>' +
-                    '<span class="calc-row-value">$' + item.price.toLocaleString() + '<span class="copay">' + copayText + '</span></span>' +
+                    '<span class="calc-row-value">$' + item.subsidy.toLocaleString() + '<span class="copay">' + copayText + '</span></span>' +
                     '</div>' +
                     '<div class="calc-row">' +
                     '<span class="calc-row-label">小計</span>' +
@@ -2661,7 +2663,8 @@
                     // EF碼購置
                     let efItem = efPurchaseItems.find(s => s.code === code);
                     if (efItem) {
-                        const price = getEfItemPrice(efItem, state.identity);
+                        const subsidy = getEfItemPrice(efItem, state.identity);
+                        const price = efItem.maxPrice;
                         const subtotal = price * qty;
                         const isFree = efItem.freePartial;
                         const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
@@ -2669,7 +2672,7 @@
                         efTotal += subtotal;
                         efCopaySum += copayTotal;
                         efLines.push('• ' + code + ' ' + efItem.name);
-                        efLines.push('  補助 $' + price.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayUnit.toLocaleString() + '）'));
+                        efLines.push('  補助 $' + subsidy.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayUnit.toLocaleString() + '）'));
                         efLines.push('  ' + qty + '件 $' + subtotal.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayTotal.toLocaleString() + '）'));
                         return;
                     }
@@ -2677,7 +2680,8 @@
                     // EF碼租賃
                     efItem = efRentalItems.find(s => s.code === code);
                     if (efItem) {
-                        const price = getEfItemPrice(efItem, state.identity);
+                        const subsidy = getEfItemPrice(efItem, state.identity);
+                        const price = efItem.maxPrice;
                         const subtotal = price * qty;
                         const isFree = efItem.freePartial;
                         const copayUnit = isFree ? 0 : Math.floor(price * rateEf);
@@ -2685,7 +2689,7 @@
                         efTotal += subtotal;
                         efCopaySum += copayTotal;
                         efLines.push('• ' + code + ' ' + efItem.name + ' （租賃）');
-                        efLines.push('  月租 $' + price.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayUnit.toLocaleString() + '）'));
+                        efLines.push('  月租 $' + subsidy.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayUnit.toLocaleString() + '）'));
                         efLines.push('  ' + qty + '月 $' + subtotal.toLocaleString() + (isFree ? '（免部分負擔）' : '（自負 $' + copayTotal.toLocaleString() + '）'));
                     }
                 });
@@ -2902,26 +2906,28 @@
                     // EF碼購置
                     let efItem = efPurchaseItems.find(s => s.code === code);
                     if (efItem) {
-                        const price = getEfItemPrice(efItem, state.identity);
+                        const subsidy = getEfItemPrice(efItem, state.identity);
+                        const price = efItem.maxPrice;
                         const subtotal = price * qty;
                         const isFree = efItem.freePartial;
                         const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
                         efTotal += subtotal;
                         efCopaySum += copayTotal;
-                        efSelected.push({ ...efItem, price, qty, subtotal, isFree, copayTotal, isRental: false });
+                        efSelected.push({ ...efItem, price, subsidy, qty, subtotal, isFree, copayTotal, isRental: false });
                         return;
                     }
 
                     // EF碼租賃
                     efItem = efRentalItems.find(s => s.code === code);
                     if (efItem) {
-                        const price = getEfItemPrice(efItem, state.identity);
+                        const subsidy = getEfItemPrice(efItem, state.identity);
+                        const price = efItem.maxPrice;
                         const subtotal = price * qty;
                         const isFree = efItem.freePartial;
                         const copayTotal = isFree ? 0 : Math.floor(subtotal * rateEf);
                         efTotal += subtotal;
                         efCopaySum += copayTotal;
-                        efSelected.push({ ...efItem, price, qty, subtotal, isFree, copayTotal, isRental: true });
+                        efSelected.push({ ...efItem, price, subsidy, qty, subtotal, isFree, copayTotal, isRental: true });
                     }
                 });
 
@@ -3080,7 +3086,7 @@
                         html += '<div class="export-item-header">';
                         html += '<span class="export-item-name"><span class="code">' + item.code + '</span>' + item.name + (item.isRental ? ' （租賃）' : '') + '</span>';
                         html += '</div>';
-                        html += '<div class="export-item-detail">$' + item.price.toLocaleString() + ' × ' + item.qty + unitText + ' = $' + item.subtotal.toLocaleString() + copayText + '</div>';
+                        html += '<div class="export-item-detail">補助$' + item.subsidy.toLocaleString() + ' × ' + item.qty + unitText + ' = $' + item.subtotal.toLocaleString() + copayText + '</div>';
                         html += '</div>';
                     });
                 }
